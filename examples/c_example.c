@@ -1,12 +1,12 @@
-// examples/c_example.c - 纯 C 示例：使用 oic.h C API。
+// examples/c_example.c - 纯 C 示例：使用 image_codec.h C API。
 //
-// 用法：oic_example_c <in.bmp> <out-prefix>
+// 用法：image_codec_example_c <in.bmp> <out-prefix>
 //   1. 枚举 OpenCL 设备
-//   2. 读取 24-bit BMP 为 oic_image
+//   2. 读取 24-bit BMP 为 image_codec_image
 //   3. 编码 TIFF / JPEG（OpenCL 后端）写盘
 //   4. 读回 JPEG 解码并校验尺寸
 //   5. 错误路径：对垃圾数据解码应返回明确错误码而不崩溃
-#include <OpenCLImageCodec/oic.h>
+#include <OpenCLImageCodec/image_codec.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -107,7 +107,7 @@ static int read_file(const char *path, uint8_t **data, size_t *size) {
 
 int main(int argc, char **argv) {
   if (argc < 3) {
-    fprintf(stderr, "usage: oic_example_c <in.bmp> <out-prefix>\n");
+    fprintf(stderr, "usage: image_codec_example_c <in.bmp> <out-prefix>\n");
     return 2;
   }
   const char *in_bmp = argv[1];
@@ -116,18 +116,18 @@ int main(int argc, char **argv) {
   /* 1. 枚举 OpenCL 设备 */
   char **devs = NULL;
   int ndevs = 0;
-  oic_status st = oic_device_list(&devs, &ndevs);
-  if (st != OIC_OK) {
-    fprintf(stderr, "oic_device_list: %s\n", oic_status_string(st));
+  image_codec_status st = image_codec_device_list(&devs, &ndevs);
+  if (st != IMAGE_CODEC_OK) {
+    fprintf(stderr, "image_codec_device_list: %s\n", image_codec_status_string(st));
     return 1;
   }
   printf("%d OpenCL device(s):\n", ndevs);
   for (int i = 0; i < ndevs; i++) {
     printf("  [%d] %s\n", i, devs[i]);
   }
-  oic_device_list_free(devs, ndevs);
+  image_codec_device_list_free(devs, ndevs);
 
-  /* 2. 读 BMP -> oic_image */
+  /* 2. 读 BMP -> image_codec_image */
   uint8_t *px = NULL;
   size_t px_size = 0;
   uint32_t w = 0, h = 0;
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "cannot load BMP: %s\n", in_bmp);
     return 1;
   }
-  oic_image img;
+  image_codec_image img;
   memset(&img, 0, sizeof(img));
   img.width = w;
   img.height = h;
@@ -146,15 +146,15 @@ int main(int argc, char **argv) {
   printf("loaded %s: %ux%u (%zu bytes)\n", in_bmp, w, h, px_size);
 
   /* 3. 创建编解码器（OpenCL 后端） */
-  oic_codec *codec = NULL;
-  st = oic_codec_create(&codec, OIC_BACKEND_OPENCL);
-  if (st != OIC_OK) {
-    fprintf(stderr, "oic_codec_create: %s\n", oic_status_string(st));
+  image_codec_codec *codec = NULL;
+  st = image_codec_codec_create(&codec, IMAGE_CODEC_BACKEND_OPENCL);
+  if (st != IMAGE_CODEC_OK) {
+    fprintf(stderr, "image_codec_codec_create: %s\n", image_codec_status_string(st));
     free(px);
     return 1;
   }
 
-  oic_encode_params params;
+  image_codec_encode_params params;
   memset(&params, 0, sizeof(params));
   params.jpeg_quality = 85;
   params.tiff_compression = 5;      /* LZW */
@@ -166,10 +166,10 @@ int main(int argc, char **argv) {
   int failed = 0;
 
   /* 4a. 编码 TIFF */
-  st = oic_codec_encode(codec, OIC_FORMAT_TIFF, &img, &params, out_buf,
+  st = image_codec_codec_encode(codec, IMAGE_CODEC_FORMAT_TIFF, &img, &params, out_buf,
                         &out_len, sizeof(out_buf));
-  if (st != OIC_OK) {
-    fprintf(stderr, "encode TIFF: %s\n", oic_status_string(st));
+  if (st != IMAGE_CODEC_OK) {
+    fprintf(stderr, "encode TIFF: %s\n", image_codec_status_string(st));
     failed = 1;
   } else {
     snprintf(out_path, sizeof(out_path), "%s.tif", prefix);
@@ -182,10 +182,10 @@ int main(int argc, char **argv) {
   }
 
   /* 4b. 编码 JPEG */
-  st = oic_codec_encode(codec, OIC_FORMAT_JPEG, &img, &params, out_buf,
+  st = image_codec_codec_encode(codec, IMAGE_CODEC_FORMAT_JPEG, &img, &params, out_buf,
                         &out_len, sizeof(out_buf));
-  if (st != OIC_OK) {
-    fprintf(stderr, "encode JPEG: %s\n", oic_status_string(st));
+  if (st != IMAGE_CODEC_OK) {
+    fprintf(stderr, "encode JPEG: %s\n", image_codec_status_string(st));
     failed = 1;
   } else {
     snprintf(out_path, sizeof(out_path), "%s.jpg", prefix);
@@ -206,12 +206,12 @@ int main(int argc, char **argv) {
       fprintf(stderr, "cannot read %s\n", out_path);
       failed = 1;
     } else {
-      oic_image dec;
+      image_codec_image dec;
       memset(&dec, 0, sizeof(dec));
-      st = oic_codec_decode(codec, OIC_FORMAT_JPEG, jpeg_data, jpeg_size, &dec);
+      st = image_codec_codec_decode(codec, IMAGE_CODEC_FORMAT_JPEG, jpeg_data, jpeg_size, &dec);
       free(jpeg_data);
-      if (st != OIC_OK) {
-        fprintf(stderr, "decode JPEG: %s\n", oic_status_string(st));
+      if (st != IMAGE_CODEC_OK) {
+        fprintf(stderr, "decode JPEG: %s\n", image_codec_status_string(st));
         failed = 1;
       } else {
         printf("decoded %s -> %ux%u channels=%u (%zu bytes)\n", out_path,
@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
           fprintf(stderr, "size mismatch after decode\n");
           failed = 1;
         }
-        oic_image_free(&dec);
+        image_codec_image_free(&dec);
       }
     }
   }
@@ -229,19 +229,19 @@ int main(int argc, char **argv) {
   {
     static const uint8_t junk[16] = {0xde, 0xad, 0xbe, 0xef, 1, 2, 3, 4,
                                      5,    6,    7,    8,    9, 10, 11, 12};
-    oic_image bad;
+    image_codec_image bad;
     memset(&bad, 0, sizeof(bad));
-    st = oic_codec_decode(codec, OIC_FORMAT_JPEG, junk, sizeof(junk), &bad);
-    printf("error path: decode(garbage) -> %s (%d)\n", oic_status_string(st),
+    st = image_codec_codec_decode(codec, IMAGE_CODEC_FORMAT_JPEG, junk, sizeof(junk), &bad);
+    printf("error path: decode(garbage) -> %s (%d)\n", image_codec_status_string(st),
            (int)st);
-    if (st == OIC_OK) {
+    if (st == IMAGE_CODEC_OK) {
       fprintf(stderr, "expected a non-OK status for garbage input\n");
       failed = 1;
-      oic_image_free(&bad);
+      image_codec_image_free(&bad);
     }
   }
 
-  oic_codec_destroy(codec);
+  image_codec_codec_destroy(codec);
   free(px);
   return failed ? 1 : 0;
 }
