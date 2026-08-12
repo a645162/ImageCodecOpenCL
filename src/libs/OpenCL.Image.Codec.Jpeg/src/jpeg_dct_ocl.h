@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace jpeg {
 
 // 内嵌 kernel 源码（由 CMake 生成的 jpeg_cl_strings.cpp 提供）。
@@ -31,4 +31,4 @@ int jpeg_cpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
                     std::vector<uint8_t>* rgb, std::string* err);
 
 }  // namespace jpeg
-}  // namespace oic
+}  // namespace imagecodec

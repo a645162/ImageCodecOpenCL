@@ -53,7 +53,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 // 用 GPU（段级并行）解码一段 LZW 压缩数据，语义与 CPU 参考 lzwDecode 一致
@@ -74,4 +74,4 @@ int gpuLzwDecode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out);
 int gpuLzwDecodePar(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out);
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

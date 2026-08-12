@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 // 把 top-down RGB 图像（width*3 字节/行）写为 TIFF 文件。
@@ -23,4 +23,4 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
 int cpuLzwEncode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out);
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

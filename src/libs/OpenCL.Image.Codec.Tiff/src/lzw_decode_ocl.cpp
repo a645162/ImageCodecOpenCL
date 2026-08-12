@@ -14,14 +14,14 @@
 #include <vector>
 
 // 内嵌 kernel 源码（由 CMake file(READ)+configure_file 生成）。
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 extern const char* lzw_decode_cl_source;
 extern const char* lzw_decode_par_cl_source;
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 namespace {
@@ -577,4 +577,4 @@ cleanup:
 }
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

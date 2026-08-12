@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 // ---- TIFF 6.0 常用 Tag/Type/值常量 ----
@@ -91,7 +91,7 @@ public:
   bool loadTile(size_t index, std::vector<uint8_t>& out) const;
   bool loadBytes(uint32_t offset, uint32_t length, std::vector<uint8_t>& out) const;
 
-  // 打印文件头信息（供 oic_tiff_info）。
+  // 打印文件头信息（供 imagecodec_tiff_info）。
   void printInfo(FILE* fp) const;
 
 private:
@@ -172,4 +172,4 @@ private:
 };
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

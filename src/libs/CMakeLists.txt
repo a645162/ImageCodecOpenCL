@@ -5,4 +5,4 @@
 add_subdirectory(OpenCL.Image.Codec.Core)     # OpenCLImageCodec::Core       平台抽象 + OpenCL 设备/上下文/kernel
 add_subdirectory(OpenCL.Image.Codec.Tiff)     # OpenCLImageCodec::Tiff       TIFF 容器 + LZW 编码(GPU)/解码(CPU)
 add_subdirectory(OpenCL.Image.Codec.Jpeg)     # OpenCLImageCodec::Jpeg       baseline JPEG 混合编解码（OpenCL）
-add_subdirectory(OpenCL.Image.Codec.Api)      # OpenCLImageCodec::Api        C API（oic.h）实现
+add_subdirectory(OpenCL.Image.Codec.Api)      # OpenCLImageCodec::Api        C API（imagecodec.h）实现

@@ -1,8 +1,8 @@
-// examples/cpp_example.cpp - C++ 示例：使用 oic.hpp RAII 包装。
+// examples/cpp_example.cpp - C++ 示例：使用 imagecodec.hpp RAII 包装。
 //
-// 用法：oic_example_cpp <in.bmp> <out-prefix>
+// 用法：imagecodec_example_cpp <in.bmp> <out-prefix>
 //   与 c_example.c 等价，但全程 RAII/异常，无需手动释放。
-#include <OpenCLImageCodec/oic.hpp>
+#include <OpenCLImageCodec/imagecodec.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -90,18 +90,18 @@ bool write_file(const char *path, const uint8_t *data, size_t size) {
 
 int main(int argc, char **argv) {
   if (argc < 3) {
-    std::fprintf(stderr, "usage: oic_example_cpp <in.bmp> <out-prefix>\n");
+    std::fprintf(stderr, "usage: imagecodec_example_cpp <in.bmp> <out-prefix>\n");
     return 2;
   }
   try {
     /* 1. 枚举 OpenCL 设备（RAII，析构自动释放） */
-    oic::DeviceList devs;
+    imagecodec::DeviceList devs;
     std::printf("%d OpenCL device(s):\n", devs.size());
     for (int i = 0; i < devs.size(); i++) {
       std::printf("  [%d] %s\n", i, devs.name(i));
     }
 
-    /* 2. 读 BMP -> oic::Image（数据转移给 Image 管理） */
+    /* 2. 读 BMP -> imagecodec::Image（数据转移给 Image 管理） */
     std::vector<uint8_t> rgb;
     uint32_t w = 0, h = 0;
     if (!load_bmp(argv[1], &rgb, &w, &h)) {
@@ -114,17 +114,17 @@ int main(int argc, char **argv) {
       return 1;
     }
     std::memcpy(px, rgb.data(), rgb.size());
-    oic::Image img(w, h, 3, px, (size_t)w * 3, rgb.size());
+    imagecodec::Image img(w, h, 3, px, (size_t)w * 3, rgb.size());
     std::printf("loaded %s: %ux%u (%zu bytes)\n", argv[1], w, h, rgb.size());
 
     /* 3. 编解码器 + 编码参数 */
-    oic::Codec codec(OIC_BACKEND_OPENCL);
-    oic_encode_params params = oic::default_encode_params();
+    imagecodec::Codec codec(IMAGECODEC_BACKEND_OPENCL);
+    imagecodec_encode_params params = imagecodec::default_encode_params();
     // params.jpeg_quality = 85; tiff_compression = 5; rows_per_strip = 0。
 
     /* 4a. 编码 TIFF */
     {
-      std::vector<uint8_t> tif = codec.encode(OIC_FORMAT_TIFF, img, params);
+      std::vector<uint8_t> tif = codec.encode(IMAGECODEC_FORMAT_TIFF, img, params);
       const std::string path = std::string(argv[2]) + ".tif";
       if (!write_file(path.c_str(), tif.data(), tif.size())) {
         std::fprintf(stderr, "cannot write %s\n", path.c_str());
@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
     /* 4b. 编码 JPEG */
     std::vector<uint8_t> jpg;
     {
-      jpg = codec.encode(OIC_FORMAT_JPEG, img, params);
+      jpg = codec.encode(IMAGECODEC_FORMAT_JPEG, img, params);
       const std::string path = std::string(argv[2]) + ".jpg";
       if (!write_file(path.c_str(), jpg.data(), jpg.size())) {
         std::fprintf(stderr, "cannot write %s\n", path.c_str());
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
 
     /* 5. 解码回读并校验尺寸 */
     {
-      oic::Image dec = codec.decode(OIC_FORMAT_JPEG, jpg.data(), jpg.size());
+      imagecodec::Image dec = codec.decode(IMAGECODEC_FORMAT_JPEG, jpg.data(), jpg.size());
       std::printf("decoded -> %ux%u channels=%u (%zu bytes)\n", dec.width(),
                   dec.height(), dec.channels(), dec.data_size());
       if (dec.width() != w || dec.height() != h) {
@@ -158,25 +158,25 @@ int main(int argc, char **argv) {
       }
     }
 
-    /* 6. 错误路径：垃圾数据解码应抛 oic::Error 而非崩溃 */
+    /* 6. 错误路径：垃圾数据解码应抛 imagecodec::Error 而非崩溃 */
     {
       static const uint8_t junk[16] = {0xde, 0xad, 0xbe, 0xef, 1, 2, 3, 4,
                                        5,    6,    7,    8,    9, 10, 11, 12};
       try {
-        oic::Image bad =
-            codec.decode(OIC_FORMAT_JPEG, junk, sizeof(junk));
-        std::fprintf(stderr, "expected oic::Error for garbage input\n");
+        imagecodec::Image bad =
+            codec.decode(IMAGECODEC_FORMAT_JPEG, junk, sizeof(junk));
+        std::fprintf(stderr, "expected imagecodec::Error for garbage input\n");
         (void)bad;
         return 1;
-      } catch (const oic::Error &e) {
+      } catch (const imagecodec::Error &e) {
         std::printf("error path: decode(garbage) -> %s (%d)\n", e.what(),
                     static_cast<int>(e.status()));
       }
     }
 
     return 0;
-  } catch (const oic::Error &e) {
-    std::fprintf(stderr, "oic error: %s (%d)\n", e.what(),
+  } catch (const imagecodec::Error &e) {
+    std::fprintf(stderr, "imagecodec error: %s (%d)\n", e.what(),
                  static_cast<int>(e.status()));
     return 1;
   } catch (const std::exception &e) {

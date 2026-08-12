@@ -1,5 +1,5 @@
 // src/jpeg/selftest/selftest.cpp - JPEG 模块自测（临时，默认关闭）。
-// 用法: oic_jpeg_selftest <workdir>
+// 用法: imagecodec_jpeg_selftest <workdir>
 //   workdir 内需有由 gen_ref.py 生成的：
 //     ref.bmp, ref_444_q95.jpg, ref_444_pil.bmp, ref_420_q90.jpg, ref_420_pil.bmp,
 //     ref_422_q90.jpg, ref_422_pil.bmp, gray_q95.jpg, gray_pil.bmp, tiny8_q95.jpg
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-using namespace oic::jpeg;
+using namespace imagecodec::jpeg;
 
 namespace {
 
@@ -163,10 +163,10 @@ int main(int argc, char** argv) {
   const std::string cli_out = dir + "/cli_dec.bmp";
   const std::string cli_bmp = p("ref.bmp");
   const std::string cli_jpg = dir + "/cli_enc.jpg";
-  std::printf("[cli] oic_jpeg_info: ");
-  const int r_info = oic_jpeg_info(cli_in.c_str());
-  std::printf("[cli] oic_jpeg_decode -> %d\n", oic_jpeg_decode(cli_in.c_str(), cli_out.c_str(), 0));
-  std::printf("[cli] oic_jpeg_encode -> %d\n", oic_jpeg_encode(cli_bmp.c_str(), cli_jpg.c_str(), 0, 95));
+  std::printf("[cli] imagecodec_jpeg_info: ");
+  const int r_info = imagecodec_jpeg_info(cli_in.c_str());
+  std::printf("[cli] imagecodec_jpeg_decode -> %d\n", imagecodec_jpeg_decode(cli_in.c_str(), cli_out.c_str(), 0));
+  std::printf("[cli] imagecodec_jpeg_encode -> %d\n", imagecodec_jpeg_encode(cli_bmp.c_str(), cli_jpg.c_str(), 0, 95));
   if (r_info != 0) rc |= 1;
 
   std::printf("=== %s ===\n", rc == 0 ? "ALL PASS" : "FAILURES PRESENT");

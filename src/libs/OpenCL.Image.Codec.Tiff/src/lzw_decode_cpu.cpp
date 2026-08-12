@@ -5,7 +5,7 @@
 // 到栈再反转，避免逐字节拷贝。
 #include "lzw_decode_cpu.h"
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 namespace {
@@ -127,4 +127,4 @@ int lzwDecode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out) {
 }
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

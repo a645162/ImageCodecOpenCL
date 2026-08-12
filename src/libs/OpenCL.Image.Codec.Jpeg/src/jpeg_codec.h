@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace jpeg {
 
 struct JpegDecodeResult {
@@ -35,4 +35,4 @@ int jpeg_encode_bmp_file(const std::string& in_bmp, const std::string& out_jpg,
                          int backend, int quality, std::string* err);
 
 }  // namespace jpeg
-}  // namespace oic
+}  // namespace imagecodec

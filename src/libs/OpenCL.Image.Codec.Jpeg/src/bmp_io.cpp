@@ -5,7 +5,7 @@
 #include <cstring>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 namespace jpeg {
 
 namespace {
@@ -154,4 +154,4 @@ int bmp_write(const std::string& path, const uint8_t* rgb, int width, int height
 }
 
 }  // namespace jpeg
-}  // namespace oic
+}  // namespace imagecodec

@@ -1,4 +1,4 @@
-#include "oic_platform.h"
+#include "imagecodec_platform.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
-char *oic_exe_dir(void) {
+char *imagecodec_exe_dir(void) {
   char buf[MAX_PATH];
   const DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
   if (n == 0 || n >= MAX_PATH) {
@@ -25,7 +25,7 @@ char *oic_exe_dir(void) {
   return out;
 }
 
-long long oic_now_ns(void) {
+long long imagecodec_now_ns(void) {
   LARGE_INTEGER freq, counter;
   if (!QueryPerformanceFrequency(&freq) || freq.QuadPart == 0) {
     return 0;
@@ -36,7 +36,7 @@ long long oic_now_ns(void) {
       1e9);
 }
 
-void oic_sleep_ms(unsigned ms) { Sleep(ms); }
+void imagecodec_sleep_ms(unsigned ms) { Sleep(ms); }
 
 #else
 // POSIX 预留实现（阶段0 仅 Windows 主路径；Linux/macOS 后续补充）。
@@ -45,9 +45,9 @@ void oic_sleep_ms(unsigned ms) { Sleep(ms); }
 #include <ctime>
 #include <thread>
 
-char *oic_exe_dir(void) { return nullptr; }
+char *imagecodec_exe_dir(void) { return nullptr; }
 
-long long oic_now_ns(void) {
+long long imagecodec_now_ns(void) {
   struct timespec ts;
   if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
     return 0;
@@ -55,7 +55,7 @@ long long oic_now_ns(void) {
   return static_cast<long long>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
 }
 
-void oic_sleep_ms(unsigned ms) {
+void imagecodec_sleep_ms(unsigned ms) {
   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 #endif

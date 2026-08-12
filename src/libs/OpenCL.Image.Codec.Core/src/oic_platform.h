@@ -1,4 +1,4 @@
-// platform/oic_platform.h - 内部平台抽象（不对外导出）。
+// platform/imagecodec_platform.h - 内部平台抽象（不对外导出）。
 #pragma once
 
 #include <stddef.h>
@@ -8,13 +8,13 @@ extern "C" {
 #endif
 
 // 可执行文件所在目录（malloc'd，调用方 free；失败返回 NULL）。
-char *oic_exe_dir(void);
+char *imagecodec_exe_dir(void);
 
 // 单调时钟纳秒（用于计时基准）。
-long long oic_now_ns(void);
+long long imagecodec_now_ns(void);
 
 // 忙等毫秒。
-void oic_sleep_ms(unsigned ms);
+void imagecodec_sleep_ms(unsigned ms);
 
 #ifdef __cplusplus
 }

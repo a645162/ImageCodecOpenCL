@@ -1,3 +1,3 @@
-add_executable(oic main.cpp)
-target_link_libraries(oic PRIVATE
+add_executable(imagecodec main.cpp)
+target_link_libraries(imagecodec PRIVATE
   OpenCLImageCodec::OpenCLImageCodec)

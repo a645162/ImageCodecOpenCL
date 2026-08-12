@@ -1,11 +1,11 @@
-// src/api/oic.cpp - 对外 C API 实现。
+// src/api/imagecodec.cpp - 对外 C API 实现。
 //
-// 模块文件入口（oic_*_decode/encode，见各 *_test.h）接受文件路径，
+// 模块文件入口（imagecodec_*_decode/encode，见各 *_test.h）接受文件路径，
 // 本层做内存 buffer <-> 临时文件的桥接：
-//   decode: buffer -> 临时输入文件 -> 模块解码 -> 临时 BMP -> oic_image
-//   encode: oic_image -> 临时 BMP -> 模块编码 -> 输出文件 -> buffer
+//   decode: buffer -> 临时输入文件 -> 模块解码 -> 临时 BMP -> imagecodec_image
+//   encode: imagecodec_image -> 临时 BMP -> 模块编码 -> 输出文件 -> buffer
 // 临时文件放在系统临时目录（Windows GetTempPathA/GetTempFileNameA）。
-#include "OpenCLImageCodec/oic.h"
+#include "OpenCLImageCodec/imagecodec.h"
 
 #include "../../OpenCL.Image.Codec.Core/src/ocl_device.h"
 #include "../../OpenCL.Image.Codec.Jpeg/src/bmp_io.h"
@@ -26,12 +26,12 @@
 #include <unistd.h>
 #endif
 
-using oic::OclDevice;
-using oic::OclDeviceInfo;
+using imagecodec::OclDevice;
+using imagecodec::OclDeviceInfo;
 
 // 不透明句柄实际结构。
-struct oic_codec {
-  int backend;  // oic_backend 的整数值
+struct imagecodec_codec {
+  int backend;  // imagecodec_backend 的整数值
 };
 
 namespace {
@@ -45,13 +45,13 @@ bool make_temp_path(std::string *out) {
     return false;
   }
   char path[MAX_PATH];
-  if (GetTempFileNameA(dir, "oic", 0, path) == 0) {
+  if (GetTempFileNameA(dir, "imagecodec", 0, path) == 0) {
     return false;
   }
   *out = path;
   return true;
 #else
-  char tmpl[] = "/tmp/oic_XXXXXX";
+  char tmpl[] = "/tmp/imagecodec_XXXXXX";
   int fd = ::mkstemp(tmpl);
   if (fd < 0) {
     return false;
@@ -95,25 +95,25 @@ bool read_file(const std::string &path, std::vector<uint8_t> *out) {
 extern "C" {
 
 // ---- 状态码 ----
-const char *oic_status_string(oic_status status) {
+const char *imagecodec_status_string(imagecodec_status status) {
   switch (status) {
-    case OIC_OK:
+    case IMAGECODEC_OK:
       return "success";
-    case OIC_ERR_INVALID_ARGUMENT:
+    case IMAGECODEC_ERR_INVALID_ARGUMENT:
       return "invalid argument";
-    case OIC_ERR_OUT_OF_MEMORY:
+    case IMAGECODEC_ERR_OUT_OF_MEMORY:
       return "out of memory";
-    case OIC_ERR_BACKEND_UNAVAILABLE:
+    case IMAGECODEC_ERR_BACKEND_UNAVAILABLE:
       return "backend unavailable";
-    case OIC_ERR_UNSUPPORTED_FORMAT:
+    case IMAGECODEC_ERR_UNSUPPORTED_FORMAT:
       return "unsupported format";
-    case OIC_ERR_DECODE_FAILED:
+    case IMAGECODEC_ERR_DECODE_FAILED:
       return "decode failed";
-    case OIC_ERR_ENCODE_FAILED:
+    case IMAGECODEC_ERR_ENCODE_FAILED:
       return "encode failed";
-    case OIC_ERR_IO:
+    case IMAGECODEC_ERR_IO:
       return "I/O error";
-    case OIC_ERR_INTERNAL:
+    case IMAGECODEC_ERR_INTERNAL:
       return "internal error";
     default:
       return "unknown status";
@@ -121,78 +121,78 @@ const char *oic_status_string(oic_status status) {
 }
 
 // ---- 生命周期 ----
-oic_status oic_codec_create(oic_codec **out_codec, oic_backend backend) {
+imagecodec_status imagecodec_codec_create(imagecodec_codec **out_codec, imagecodec_backend backend) {
   if (out_codec == nullptr) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
   *out_codec = nullptr;
-  if (backend != OIC_BACKEND_OPENCL && backend != OIC_BACKEND_CPU) {
-    return OIC_ERR_INVALID_ARGUMENT;
+  if (backend != IMAGECODEC_BACKEND_OPENCL && backend != IMAGECODEC_BACKEND_CPU) {
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
-  oic_codec *c = static_cast<oic_codec *>(std::malloc(sizeof(oic_codec)));
+  imagecodec_codec *c = static_cast<imagecodec_codec *>(std::malloc(sizeof(imagecodec_codec)));
   if (c == nullptr) {
-    return OIC_ERR_OUT_OF_MEMORY;
+    return IMAGECODEC_ERR_OUT_OF_MEMORY;
   }
   c->backend = static_cast<int>(backend);
   *out_codec = c;
-  return OIC_OK;
+  return IMAGECODEC_OK;
 }
 
-void oic_codec_destroy(oic_codec *codec) { std::free(codec); }
+void imagecodec_codec_destroy(imagecodec_codec *codec) { std::free(codec); }
 
 // ---- 解码 ----
-oic_status oic_codec_decode(oic_codec *codec, oic_format format,
+imagecodec_status imagecodec_codec_decode(imagecodec_codec *codec, imagecodec_format format,
                             const uint8_t *in, size_t in_len,
-                            oic_image *out) {
+                            imagecodec_image *out) {
   if (codec == nullptr || out == nullptr) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
   if (in == nullptr || in_len == 0) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
   std::memset(out, 0, sizeof(*out));
 
   std::string in_path, out_bmp;
   if (!make_temp_path(&in_path) || !make_temp_path(&out_bmp)) {
-    return OIC_ERR_IO;
+    return IMAGECODEC_ERR_IO;
   }
   if (!write_file(in_path, in, in_len)) {
     std::remove(in_path.c_str());
     std::remove(out_bmp.c_str());
-    return OIC_ERR_IO;
+    return IMAGECODEC_ERR_IO;
   }
 
   const int backend = codec->backend;
   int rc = -1;
   switch (format) {
-    case OIC_FORMAT_JPEG:
-      // oic_jpeg_decode backend: 0=opencl, 1=cpu。
-      rc = oic_jpeg_decode(in_path.c_str(), out_bmp.c_str(),
-                           backend == OIC_BACKEND_CPU ? 1 : 0);
+    case IMAGECODEC_FORMAT_JPEG:
+      // imagecodec_jpeg_decode backend: 0=opencl, 1=cpu。
+      rc = imagecodec_jpeg_decode(in_path.c_str(), out_bmp.c_str(),
+                           backend == IMAGECODEC_BACKEND_CPU ? 1 : 0);
       break;
-    case OIC_FORMAT_TIFF:
-      // oic_tiff_decode backend: 0=opencl, 2=cpu —— 与 oic_backend 枚举值一致。
-      rc = oic_tiff_decode(in_path.c_str(), out_bmp.c_str(), backend);
+    case IMAGECODEC_FORMAT_TIFF:
+      // imagecodec_tiff_decode backend: 0=opencl, 2=cpu —— 与 imagecodec_backend 枚举值一致。
+      rc = imagecodec_tiff_decode(in_path.c_str(), out_bmp.c_str(), backend);
       break;
     default:
       std::remove(in_path.c_str());
       std::remove(out_bmp.c_str());
-      return OIC_ERR_UNSUPPORTED_FORMAT;
+      return IMAGECODEC_ERR_UNSUPPORTED_FORMAT;
   }
 
   std::remove(in_path.c_str());
   if (rc != 0) {
     std::remove(out_bmp.c_str());
-    return OIC_ERR_DECODE_FAILED;
+    return IMAGECODEC_ERR_DECODE_FAILED;
   }
 
-  // 读模块写出的 BMP -> oic_image（RGB top-down）。
+  // 读模块写出的 BMP -> imagecodec_image（RGB top-down）。
   std::vector<uint8_t> rgb;
   int w = 0, h = 0;
   std::string err;
-  if (oic::jpeg::bmp_read(out_bmp, &rgb, &w, &h, &err) != 0 || rgb.empty()) {
+  if (imagecodec::jpeg::bmp_read(out_bmp, &rgb, &w, &h, &err) != 0 || rgb.empty()) {
     std::remove(out_bmp.c_str());
-    return OIC_ERR_DECODE_FAILED;
+    return IMAGECODEC_ERR_DECODE_FAILED;
   }
   std::remove(out_bmp.c_str());
 
@@ -204,24 +204,24 @@ oic_status oic_codec_decode(oic_codec *codec, oic_format format,
   out->data = static_cast<uint8_t *>(std::malloc(rgb.size()));
   if (out->data == nullptr) {
     std::memset(out, 0, sizeof(*out));
-    return OIC_ERR_OUT_OF_MEMORY;
+    return IMAGECODEC_ERR_OUT_OF_MEMORY;
   }
   std::memcpy(out->data, rgb.data(), rgb.size());
-  return OIC_OK;
+  return IMAGECODEC_OK;
 }
 
 // ---- 编码 ----
-oic_status oic_codec_encode(oic_codec *codec, oic_format format,
-                            const oic_image *img,
-                            const oic_encode_params *params, uint8_t *out,
+imagecodec_status imagecodec_codec_encode(imagecodec_codec *codec, imagecodec_format format,
+                            const imagecodec_image *img,
+                            const imagecodec_encode_params *params, uint8_t *out,
                             size_t *out_len, size_t out_capacity) {
   if (codec == nullptr || img == nullptr || out == nullptr ||
       out_len == nullptr) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
   if (img->data == nullptr || img->width == 0 || img->height == 0 ||
       img->channels != 3) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
 
   const int backend = codec->backend;
@@ -233,21 +233,21 @@ oic_status oic_codec_encode(oic_codec *codec, oic_format format,
 
   // 参数校验。
   switch (format) {
-    case OIC_FORMAT_JPEG:
+    case IMAGECODEC_FORMAT_JPEG:
       if (jpeg_quality < 1 || jpeg_quality > 100) {
-        return OIC_ERR_INVALID_ARGUMENT;
+        return IMAGECODEC_ERR_INVALID_ARGUMENT;
       }
       break;
-    case OIC_FORMAT_TIFF:
+    case IMAGECODEC_FORMAT_TIFF:
       if (tiff_compression != 1 && tiff_compression != 5) {
-        return OIC_ERR_INVALID_ARGUMENT;
+        return IMAGECODEC_ERR_INVALID_ARGUMENT;
       }
       if (tiff_rows_per_strip < 0) {
-        return OIC_ERR_INVALID_ARGUMENT;
+        return IMAGECODEC_ERR_INVALID_ARGUMENT;
       }
       break;
     default:
-      return OIC_ERR_UNSUPPORTED_FORMAT;
+      return IMAGECODEC_ERR_UNSUPPORTED_FORMAT;
   }
 
   // 打包像素行（处理 stride != width*channels 的情况）。
@@ -265,24 +265,24 @@ oic_status oic_codec_encode(oic_codec *codec, oic_format format,
 
   std::string in_bmp, out_path;
   if (!make_temp_path(&in_bmp) || !make_temp_path(&out_path)) {
-    return OIC_ERR_IO;
+    return IMAGECODEC_ERR_IO;
   }
   std::string err;
-  if (oic::jpeg::bmp_write(in_bmp, rgb, static_cast<int>(img->width),
+  if (imagecodec::jpeg::bmp_write(in_bmp, rgb, static_cast<int>(img->width),
                            static_cast<int>(img->height), &err) != 0) {
     std::remove(in_bmp.c_str());
     std::remove(out_path.c_str());
-    return OIC_ERR_IO;
+    return IMAGECODEC_ERR_IO;
   }
 
   int rc = -1;
   switch (format) {
-    case OIC_FORMAT_JPEG:
-      rc = oic_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
-                           backend == OIC_BACKEND_CPU ? 1 : 0, jpeg_quality);
+    case IMAGECODEC_FORMAT_JPEG:
+      rc = imagecodec_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
+                           backend == IMAGECODEC_BACKEND_CPU ? 1 : 0, jpeg_quality);
       break;
-    case OIC_FORMAT_TIFF:
-      rc = oic_tiff_encode(in_bmp.c_str(), out_path.c_str(), backend,
+    case IMAGECODEC_FORMAT_TIFF:
+      rc = imagecodec_tiff_encode(in_bmp.c_str(), out_path.c_str(), backend,
                            tiff_compression, tiff_rows_per_strip);
       break;
     default:
@@ -291,27 +291,27 @@ oic_status oic_codec_encode(oic_codec *codec, oic_format format,
   std::remove(in_bmp.c_str());
   if (rc != 0) {
     std::remove(out_path.c_str());
-    return OIC_ERR_ENCODE_FAILED;
+    return IMAGECODEC_ERR_ENCODE_FAILED;
   }
 
   std::vector<uint8_t> encoded;
   if (!read_file(out_path, &encoded)) {
     std::remove(out_path.c_str());
-    return OIC_ERR_IO;
+    return IMAGECODEC_ERR_IO;
   }
   std::remove(out_path.c_str());
 
   if (encoded.size() > out_capacity) {
     *out_len = encoded.size();  // 告知所需大小，支持先查后写。
-    return OIC_ERR_OUT_OF_MEMORY;
+    return IMAGECODEC_ERR_OUT_OF_MEMORY;
   }
   std::memcpy(out, encoded.data(), encoded.size());
   *out_len = encoded.size();
-  return OIC_OK;
+  return IMAGECODEC_OK;
 }
 
 // ---- 释放 ----
-void oic_image_free(oic_image *img) {
+void imagecodec_image_free(imagecodec_image *img) {
   if (img == nullptr) {
     return;
   }
@@ -322,9 +322,9 @@ void oic_image_free(oic_image *img) {
 }
 
 // ---- 设备枚举 ----
-oic_status oic_device_list(char ***names, int *count) {
+imagecodec_status imagecodec_device_list(char ***names, int *count) {
   if (names == nullptr || count == nullptr) {
-    return OIC_ERR_INVALID_ARGUMENT;
+    return IMAGECODEC_ERR_INVALID_ARGUMENT;
   }
   *names = nullptr;
   *count = 0;
@@ -333,16 +333,16 @@ oic_status oic_device_list(char ***names, int *count) {
   try {
     devices = OclDevice::enumerate();
   } catch (...) {
-    return OIC_ERR_INTERNAL;
+    return IMAGECODEC_ERR_INTERNAL;
   }
   if (devices.empty()) {
-    return OIC_OK;
+    return IMAGECODEC_OK;
   }
 
   char **arr = static_cast<char **>(
       std::calloc(devices.size(), sizeof(char *)));
   if (arr == nullptr) {
-    return OIC_ERR_OUT_OF_MEMORY;
+    return IMAGECODEC_ERR_OUT_OF_MEMORY;
   }
   for (size_t i = 0; i < devices.size(); i++) {
     const OclDeviceInfo &d = devices[i];
@@ -353,18 +353,18 @@ oic_status oic_device_list(char ***names, int *count) {
     const size_t len = std::strlen(buf);
     char *name = static_cast<char *>(std::malloc(len + 1));
     if (name == nullptr) {
-      oic_device_list_free(arr, static_cast<int>(i));
-      return OIC_ERR_OUT_OF_MEMORY;
+      imagecodec_device_list_free(arr, static_cast<int>(i));
+      return IMAGECODEC_ERR_OUT_OF_MEMORY;
     }
     std::memcpy(name, buf, len + 1);
     arr[i] = name;
   }
   *names = arr;
   *count = static_cast<int>(devices.size());
-  return OIC_OK;
+  return IMAGECODEC_OK;
 }
 
-void oic_device_list_free(char **names, int count) {
+void imagecodec_device_list_free(char **names, int count) {
   if (names == nullptr) {
     return;
   }

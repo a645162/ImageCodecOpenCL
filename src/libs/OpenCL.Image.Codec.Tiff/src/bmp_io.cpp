@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 namespace {
@@ -120,4 +120,4 @@ int bmpSave(const char* path, const BmpImage& img) {
 }
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

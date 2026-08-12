@@ -9,7 +9,7 @@
 
 #include "ocl_device.h"
 
-namespace oic {
+namespace imagecodec {
 namespace tiff {
 
 // GPU LZW 编码器。设备与 kernel 只初始化一次，缓冲区按需创建/释放。
@@ -72,4 +72,4 @@ private:
 };
 
 }  // namespace tiff
-}  // namespace oic
+}  // namespace imagecodec

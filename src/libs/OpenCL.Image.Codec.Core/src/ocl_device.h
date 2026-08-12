@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace oic {
+namespace imagecodec {
 
 struct OclDeviceInfo {
   cl_platform_id platform = nullptr;
@@ -47,4 +47,4 @@ private:
   cl_command_queue queue_ = nullptr;
 };
 
-}  // namespace oic
+}  // namespace imagecodec
