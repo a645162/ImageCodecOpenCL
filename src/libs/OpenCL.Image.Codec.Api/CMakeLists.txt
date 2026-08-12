@@ -2,7 +2,6 @@
 # 桥接各模块文件入口（oic_*_test.h）与内存 buffer。
 add_library(OpenCLImageCodec.Api STATIC
   src/oic.cpp
-  src/onevpl_stub.cpp
   "${CMAKE_SOURCE_DIR}/include/OpenCLImageCodec/oic.h"
   "${CMAKE_SOURCE_DIR}/include/OpenCLImageCodec/oic.hpp")
 

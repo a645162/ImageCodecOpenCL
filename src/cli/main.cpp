@@ -3,11 +3,9 @@
 // 集成各模块测试入口（C linkage，见各 *_test.h）：
 //   - JPEG : oic_jpeg_info / oic_jpeg_decode / oic_jpeg_encode
 //   - TIFF : oic_tiff_info / oic_tiff_decode / oic_tiff_encode
-//   - oneVPL: oic_onevpl_available / oic_onevpl_encode / oic_onevpl_decode
 #include "jpeg_test.h"
 #include "ocl_device.h"
 #include "oic_platform.h"
-#include "onevpl_test.h"
 #include "tiff_test.h"
 
 #include <cstdio>
@@ -49,7 +47,7 @@ const char *format_name(FileFormat f) {
   }
 }
 
-// --backend opencl|onevpl|cpu -> code（opencl=0, onevpl=1, cpu=2）。
+// --backend opencl|cpu -> code（opencl=0, cpu=2）。
 // 返回 0 表示解析成功。
 int backend_code(const char *name, int *code) {
   if (name == nullptr || *name == '\0') {
@@ -58,10 +56,6 @@ int backend_code(const char *name, int *code) {
   }
   if (std::strcmp(name, "opencl") == 0) {
     *code = 0;
-    return 0;
-  }
-  if (std::strcmp(name, "onevpl") == 0) {
-    *code = 1;
     return 0;
   }
   if (std::strcmp(name, "cpu") == 0) {
@@ -92,10 +86,10 @@ void print_usage() {
       "Commands:\n"
       "  list-devices                                Enumerate OpenCL devices\n"
       "  info <in>                                   Print file header info (jpeg/tiff)\n"
-      "  decode <in> <out> [--backend opencl|onevpl|cpu]\n"
-      "  encode <in> <out> [--backend opencl|onevpl|cpu]\n"
+      "  decode <in> <out> [--backend opencl|cpu]\n"
+      "  encode <in> <out> [--backend opencl|cpu]\n"
       "            [--jpeg-quality N] [--tiff-compression 1|5] [--rows-per-strip N]\n"
-      "  bench <in> [--iterations N] [--backend opencl|onevpl|cpu]\n");
+      "  bench <in> [--iterations N] [--backend opencl|cpu]\n");
 }
 
 int cmd_list_devices(int, char **) {
@@ -146,15 +140,8 @@ int cmd_decode(int argc, char **argv) {
   const FileFormat fmt = detect_format(in);
   switch (fmt) {
     case FileFormat::Jpeg:
-      if (backend == 1) {  // onevpl
-        return oic_onevpl_decode(in, out);
-      }
       return oic_jpeg_decode(in, out, backend == 2 ? 1 : 0);
     case FileFormat::Tiff:
-      if (backend == 1) {
-        std::fprintf(stderr, "decode: onevpl backend not supported for TIFF\n");
-        return 2;
-      }
       return oic_tiff_decode(in, out, backend);
     default:
       std::fprintf(stderr, "decode: unrecognized format: %s\n", in);
@@ -194,16 +181,9 @@ int cmd_encode(int argc, char **argv) {
   switch (fmt) {
     case FileFormat::Jpeg: {
       const int quality = find_opt_int(argc, argv, "--jpeg-quality", 85);
-      if (backend == 1) {  // onevpl
-        return oic_onevpl_encode(in, out, quality);
-      }
       return oic_jpeg_encode(in, out, backend == 2 ? 1 : 0, quality);
     }
     case FileFormat::Tiff: {
-      if (backend == 1) {
-        std::fprintf(stderr, "encode: onevpl backend not supported for TIFF\n");
-        return 2;
-      }
       const int compression = find_opt_int(argc, argv, "--tiff-compression", 5);
       const int rows_per_strip = find_opt_int(argc, argv, "--rows-per-strip", 0);
       return oic_tiff_encode(in, out, backend, compression, rows_per_strip);
@@ -232,18 +212,13 @@ int cmd_bench(int argc, char **argv) {
     std::fprintf(stderr, "bench: unrecognized format: %s\n", in);
     return 2;
   }
-  if (fmt == FileFormat::Tiff && backend == 1) {
-    std::fprintf(stderr, "bench: onevpl backend not supported for TIFF\n");
-    return 2;
-  }
   // 解码计时（输出写到临时路径；各模块忽略重复写同一文件的代价差异不大）。
   const char *tmp_out = "bench_out.bmp";
   const long long t0 = oic_now_ns();
   for (int i = 0; i < iterations; ++i) {
     int rc = 0;
     if (fmt == FileFormat::Jpeg) {
-      rc = backend == 1 ? oic_onevpl_decode(in, tmp_out)
-                        : oic_jpeg_decode(in, tmp_out, backend == 2 ? 1 : 0);
+      rc = oic_jpeg_decode(in, tmp_out, backend == 2 ? 1 : 0);
     } else {
       rc = oic_tiff_decode(in, tmp_out, backend);
     }

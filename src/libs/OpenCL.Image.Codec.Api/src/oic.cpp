@@ -10,7 +10,6 @@
 #include "../../OpenCL.Image.Codec.Core/src/ocl_device.h"
 #include "../../OpenCL.Image.Codec.Jpeg/src/bmp_io.h"
 #include "../../OpenCL.Image.Codec.Jpeg/src/jpeg_test.h"
-#include "onevpl_test.h"  // oneVPL 后端不在本仓库，由 onevpl_stub.cpp 提供"不可用"桩
 #include "../../OpenCL.Image.Codec.Tiff/src/tiff_test.h"
 
 #include <cstdio>
@@ -91,15 +90,6 @@ bool read_file(const std::string &path, std::vector<uint8_t> *out) {
   return n == out->size();
 }
 
-// oneVPL 后端可用性。非 Windows 一律视为不可用（该后端仅 Windows 编译）。
-bool onevpl_available() {
-#if defined(_WIN32)
-  return oic_onevpl_available() == 0;
-#else
-  return false;
-#endif
-}
-
 }  // namespace
 
 extern "C" {
@@ -136,8 +126,7 @@ oic_status oic_codec_create(oic_codec **out_codec, oic_backend backend) {
     return OIC_ERR_INVALID_ARGUMENT;
   }
   *out_codec = nullptr;
-  if (backend != OIC_BACKEND_OPENCL && backend != OIC_BACKEND_ONEVPL &&
-      backend != OIC_BACKEND_CPU) {
+  if (backend != OIC_BACKEND_OPENCL && backend != OIC_BACKEND_CPU) {
     return OIC_ERR_INVALID_ARGUMENT;
   }
   oic_codec *c = static_cast<oic_codec *>(std::malloc(sizeof(oic_codec)));
@@ -177,31 +166,11 @@ oic_status oic_codec_decode(oic_codec *codec, oic_format format,
   int rc = -1;
   switch (format) {
     case OIC_FORMAT_JPEG:
-      if (backend == OIC_BACKEND_ONEVPL) {
-#if defined(_WIN32)
-        if (!onevpl_available()) {
-          std::remove(in_path.c_str());
-          std::remove(out_bmp.c_str());
-          return OIC_ERR_BACKEND_UNAVAILABLE;
-        }
-        rc = oic_onevpl_decode(in_path.c_str(), out_bmp.c_str());
-#else
-        std::remove(in_path.c_str());
-        std::remove(out_bmp.c_str());
-        return OIC_ERR_BACKEND_UNAVAILABLE;
-#endif
-      } else {
-        // oic_jpeg_decode backend: 0=opencl, 1=cpu。
-        rc = oic_jpeg_decode(in_path.c_str(), out_bmp.c_str(),
-                             backend == OIC_BACKEND_CPU ? 1 : 0);
-      }
+      // oic_jpeg_decode backend: 0=opencl, 1=cpu。
+      rc = oic_jpeg_decode(in_path.c_str(), out_bmp.c_str(),
+                           backend == OIC_BACKEND_CPU ? 1 : 0);
       break;
     case OIC_FORMAT_TIFF:
-      if (backend == OIC_BACKEND_ONEVPL) {
-        std::remove(in_path.c_str());
-        std::remove(out_bmp.c_str());
-        return OIC_ERR_BACKEND_UNAVAILABLE;
-      }
       // oic_tiff_decode backend: 0=opencl, 2=cpu —— 与 oic_backend 枚举值一致。
       rc = oic_tiff_decode(in_path.c_str(), out_bmp.c_str(), backend);
       break;
@@ -265,15 +234,11 @@ oic_status oic_codec_encode(oic_codec *codec, oic_format format,
   // 参数校验。
   switch (format) {
     case OIC_FORMAT_JPEG:
-      if (jpeg_quality < (backend == OIC_BACKEND_ONEVPL ? 0 : 1) ||
-          jpeg_quality > 100) {
+      if (jpeg_quality < 1 || jpeg_quality > 100) {
         return OIC_ERR_INVALID_ARGUMENT;
       }
       break;
     case OIC_FORMAT_TIFF:
-      if (backend == OIC_BACKEND_ONEVPL) {
-        return OIC_ERR_BACKEND_UNAVAILABLE;
-      }
       if (tiff_compression != 1 && tiff_compression != 5) {
         return OIC_ERR_INVALID_ARGUMENT;
       }
@@ -313,23 +278,8 @@ oic_status oic_codec_encode(oic_codec *codec, oic_format format,
   int rc = -1;
   switch (format) {
     case OIC_FORMAT_JPEG:
-      if (backend == OIC_BACKEND_ONEVPL) {
-#if defined(_WIN32)
-        if (!onevpl_available()) {
-          std::remove(in_bmp.c_str());
-          std::remove(out_path.c_str());
-          return OIC_ERR_BACKEND_UNAVAILABLE;
-        }
-        rc = oic_onevpl_encode(in_bmp.c_str(), out_path.c_str(), jpeg_quality);
-#else
-        std::remove(in_bmp.c_str());
-        std::remove(out_path.c_str());
-        return OIC_ERR_BACKEND_UNAVAILABLE;
-#endif
-      } else {
-        rc = oic_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
-                             backend == OIC_BACKEND_CPU ? 1 : 0, jpeg_quality);
-      }
+      rc = oic_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
+                           backend == OIC_BACKEND_CPU ? 1 : 0, jpeg_quality);
       break;
     case OIC_FORMAT_TIFF:
       rc = oic_tiff_encode(in_bmp.c_str(), out_path.c_str(), backend,

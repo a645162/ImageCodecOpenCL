@@ -41,10 +41,9 @@ typedef enum oic_status {
   OIC_ERR_INTERNAL = 8              // 内部错误
 } oic_status;
 
-// 后端：优先选择顺序 opencl / onevpl / cpu。
+// 后端：优先选择顺序 opencl / cpu。
 typedef enum oic_backend {
   OIC_BACKEND_OPENCL = 0,  // OpenCL（GPU）
-  OIC_BACKEND_ONEVPL = 1,  // oneVPL 硬件编解码（仅 JPEG，Windows）
   OIC_BACKEND_CPU = 2      // 纯 CPU
 } oic_backend;
 
@@ -66,7 +65,7 @@ typedef struct oic_image {
 } oic_image;
 
 // 编码参数。字段按目标格式选用：
-//   JPEG: jpeg_quality（1..100；ONEVPL 后端允许 0..100）
+//   JPEG: jpeg_quality（1..100）
 //   TIFF: tiff_compression（1=none, 5=LZW）、tiff_rows_per_strip（0=自动/整幅）
 typedef struct oic_encode_params {
   int jpeg_quality;
