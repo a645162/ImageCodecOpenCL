@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 // 读取 24-bit BMP。rgb 为 top-down 行序（width*height*3）。成功返回 0。
@@ -17,4 +17,4 @@ int bmp_write(const std::string& path, const uint8_t* rgb, int width, int height
               std::string* err);
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-namespace imagecodec {
+namespace image_codec {
 
 cl_int OclProgram::build(cl_context ctx, cl_device_id dev, const char *source,
                          const char *options, cl_program *out_program,
@@ -111,4 +111,4 @@ const char *OclProgram::errorName(cl_int err) {
   }
 }
 
-}  // namespace imagecodec
+}  // namespace image_codec

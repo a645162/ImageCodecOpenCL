@@ -8,7 +8,7 @@
 
 #include <cstdio>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 namespace {
@@ -176,4 +176,4 @@ int jpeg_encode_bmp_file(const std::string& in_bmp, const std::string& out_jpg,
 }
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace tiff {
 
 struct BmpImage {
@@ -23,4 +23,4 @@ int bmpLoad(const char* path, BmpImage& img);
 int bmpSave(const char* path, const BmpImage& img);
 
 }  // namespace tiff
-}  // namespace imagecodec
+}  // namespace image_codec

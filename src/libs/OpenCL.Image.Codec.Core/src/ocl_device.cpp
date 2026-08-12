@@ -4,7 +4,7 @@
 #include <cstring>
 #include <utility>
 
-namespace imagecodec {
+namespace image_codec {
 
 std::vector<OclDeviceInfo> OclDevice::enumerate() {
   std::vector<OclDeviceInfo> out;
@@ -100,4 +100,4 @@ void OclDevice::release() {
   platform_ = nullptr;
 }
 
-}  // namespace imagecodec
+}  // namespace image_codec

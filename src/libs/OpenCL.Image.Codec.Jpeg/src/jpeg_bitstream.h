@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 // 标准 zigzag 顺序表：kJpegZigzag[i] = 自然序(行优先 8x8)索引。
@@ -107,4 +107,4 @@ int jpeg_write_file(const JpegImage& img, const std::vector<uint8_t>& entropy,
                     std::vector<uint8_t>* out, std::string* err);
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

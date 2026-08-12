@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 // 标准 zigzag 顺序：zigzag[i] 给出自然序（行优先）中的位置。
@@ -531,4 +531,4 @@ int jpeg_write_file(const JpegImage& img, const std::vector<uint8_t>& entropy,
 }
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

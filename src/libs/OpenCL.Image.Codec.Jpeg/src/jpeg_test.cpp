@@ -27,17 +27,17 @@ int read_file(const char* path, std::vector<uint8_t>* out) {
 
 extern "C" {
 
-int imagecodec_jpeg_info(const char* path) {
+int image_codec_jpeg_info(const char* path) {
   if (!path) return -1;
   std::vector<uint8_t> file;
   if (read_file(path, &file) != 0) {
-    std::fprintf(stderr, "imagecodec_jpeg_info: cannot read %s\n", path);
+    std::fprintf(stderr, "image_codec_jpeg_info: cannot read %s\n", path);
     return -1;
   }
-  imagecodec::jpeg::JpegImage img;
+  image_codec::jpeg::JpegImage img;
   std::string err;
-  if (imagecodec::jpeg::jpeg_parse(file, &img, &err) != 0) {
-    std::fprintf(stderr, "imagecodec_jpeg_info: %s\n", err.c_str());
+  if (image_codec::jpeg::jpeg_parse(file, &img, &err) != 0) {
+    std::fprintf(stderr, "image_codec_jpeg_info: %s\n", err.c_str());
     return -1;
   }
   std::printf("JPEG: %dx%d, %d component(s), progressive=%d\n", img.width,
@@ -65,16 +65,16 @@ int imagecodec_jpeg_info(const char* path) {
   return 0;
 }
 
-int imagecodec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
+int image_codec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
   if (!in || !out_bmp) return -1;
-  imagecodec::jpeg::JpegDecodeResult res;
-  if (imagecodec::jpeg::jpeg_decode_file(in, backend, &res) != 0) {
-    std::fprintf(stderr, "imagecodec_jpeg_decode: %s\n", res.error.c_str());
+  image_codec::jpeg::JpegDecodeResult res;
+  if (image_codec::jpeg::jpeg_decode_file(in, backend, &res) != 0) {
+    std::fprintf(stderr, "image_codec_jpeg_decode: %s\n", res.error.c_str());
     return -1;
   }
   std::string err;
-  if (imagecodec::jpeg::bmp_write(out_bmp, res.rgb.data(), res.width, res.height, &err) != 0) {
-    std::fprintf(stderr, "imagecodec_jpeg_decode: %s\n", err.c_str());
+  if (image_codec::jpeg::bmp_write(out_bmp, res.rgb.data(), res.width, res.height, &err) != 0) {
+    std::fprintf(stderr, "image_codec_jpeg_decode: %s\n", err.c_str());
     return -1;
   }
   std::printf("decoded %s -> %s (%dx%d, subsampling=%d)\n", in, out_bmp,
@@ -82,11 +82,11 @@ int imagecodec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
   return 0;
 }
 
-int imagecodec_jpeg_encode(const char* in_bmp, const char* out, int backend, int quality) {
+int image_codec_jpeg_encode(const char* in_bmp, const char* out, int backend, int quality) {
   if (!in_bmp || !out) return -1;
   std::string err;
-  if (imagecodec::jpeg::jpeg_encode_bmp_file(in_bmp, out, backend, quality, &err) != 0) {
-    std::fprintf(stderr, "imagecodec_jpeg_encode: %s\n", err.c_str());
+  if (image_codec::jpeg::jpeg_encode_bmp_file(in_bmp, out, backend, quality, &err) != 0) {
+    std::fprintf(stderr, "image_codec_jpeg_encode: %s\n", err.c_str());
     return -1;
   }
   std::printf("encoded %s -> %s (quality=%d, backend=%d)\n", in_bmp, out, quality,

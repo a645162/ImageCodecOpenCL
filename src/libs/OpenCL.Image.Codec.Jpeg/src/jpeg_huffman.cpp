@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 // ---- 位读取器 ----
@@ -364,4 +364,4 @@ int jpeg_entropy_encode(const JpegImage& img, const std::vector<float>& coeffs,
 }
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

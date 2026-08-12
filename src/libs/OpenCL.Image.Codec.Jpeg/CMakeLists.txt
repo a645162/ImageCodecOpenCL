@@ -31,8 +31,8 @@ target_link_libraries(OpenCLImageCodec.Jpeg PUBLIC
 add_library(OpenCLImageCodec::Jpeg ALIAS OpenCLImageCodec.Jpeg)
 
 # 可选自测可执行（默认关闭；供本模块独立验证）。
-option(IMAGECODEC_BUILD_JPEG_SELFTEST "Build JPEG self-test executable" OFF)
-if(IMAGECODEC_BUILD_JPEG_SELFTEST)
-  add_executable(imagecodec_jpeg_selftest src/selftest/selftest.cpp)
-  target_link_libraries(imagecodec_jpeg_selftest PRIVATE OpenCLImageCodec.Jpeg)
+option(IMAGE_CODEC_BUILD_JPEG_SELFTEST "Build JPEG self-test executable" OFF)
+if(IMAGE_CODEC_BUILD_JPEG_SELFTEST)
+  add_executable(image_codec_jpeg_selftest src/selftest/selftest.cpp)
+  target_link_libraries(image_codec_jpeg_selftest PRIVATE OpenCLImageCodec.Jpeg)
 endif()

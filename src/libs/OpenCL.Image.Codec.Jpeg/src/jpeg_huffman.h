@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 // MSB-first 位读取器：处理 0xFF00 去填充、RSTn 标记与 EOI。
@@ -43,4 +43,4 @@ int jpeg_entropy_encode(const JpegImage& img, const std::vector<float>& coeffs,
                         std::vector<uint8_t>* entropy, std::string* err);
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

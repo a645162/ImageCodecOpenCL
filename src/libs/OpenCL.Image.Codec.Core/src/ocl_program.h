@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace imagecodec {
+namespace image_codec {
 
 struct OclProgram {
   // 从源码字符串构建 program（失败返回 OpenCL 错误码，build_log 含诊断）。
@@ -20,4 +20,4 @@ struct OclProgram {
   static const char *errorName(cl_int err);
 };
 
-}  // namespace imagecodec
+}  // namespace image_codec

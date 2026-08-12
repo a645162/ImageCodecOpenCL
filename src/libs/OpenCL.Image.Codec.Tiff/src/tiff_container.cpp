@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace imagecodec {
+namespace image_codec {
 namespace tiff {
 
 // ---------------------------------------------------------------------------
@@ -410,7 +410,7 @@ void TiffWriter::build() {
   // 旧实现一律写 off_off/off_cnt（数组地址），导致单 strip（n_==1）文件里
   // StripOffsets 被读成 140（偏移数组自身地址）、StripByteCounts 被读成 144，
   // 而真实条带数据在 148 处、长度 46076——解码器读到"数组字节 + 截断的码流"
-  // 必然解码失败（imagecodec 解码 -11 / ffmpeg "Decoded only 0 bytes"）。
+  // 必然解码失败（image_codec 解码 -11 / ffmpeg "Decoded only 0 bytes"）。
   // 多 strip（n_>1）时地址语义正确，故仅 count==1 需写入实际值。
   // 该缺陷与 LZW 字典满无关：小图（不触发字典满）单 strip 同样损坏，
   // 而修复后完整码流（含多次字典满 ClearCode）可逐字节正确解码。
@@ -473,4 +473,4 @@ bool TiffWriter::saveFile(const char* path) const {
 }
 
 }  // namespace tiff
-}  // namespace imagecodec
+}  // namespace image_codec

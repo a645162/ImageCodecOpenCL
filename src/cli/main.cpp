@@ -1,11 +1,11 @@
 // cli/main.cpp - OpenCL-Image-Codec 测试 CLI（单可执行 + 子命令）。
 //
 // 集成各模块测试入口（C linkage，见各 *_test.h）：
-//   - JPEG : imagecodec_jpeg_info / imagecodec_jpeg_decode / imagecodec_jpeg_encode
-//   - TIFF : imagecodec_tiff_info / imagecodec_tiff_decode / imagecodec_tiff_encode
+//   - JPEG : image_codec_jpeg_info / image_codec_jpeg_decode / image_codec_jpeg_encode
+//   - TIFF : image_codec_tiff_info / image_codec_tiff_decode / image_codec_tiff_encode
 #include "jpeg_test.h"
 #include "ocl_device.h"
-#include "imagecodec_platform.h"
+#include "image_codec_platform.h"
 #include "tiff_test.h"
 
 #include <cstdio>
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-using namespace imagecodec;
+using namespace image_codec;
 
 namespace {
 
@@ -82,7 +82,7 @@ int find_opt_int(int argc, char **argv, const char *key, int def) {
 void print_usage() {
   std::printf(
       "OpenCL-Image-Codec CLI\n"
-      "Usage: imagecodec <command> [options]\n"
+      "Usage: image_codec <command> [options]\n"
       "Commands:\n"
       "  list-devices                                Enumerate OpenCL devices\n"
       "  info <in>                                   Print file header info (jpeg/tiff)\n"
@@ -115,10 +115,10 @@ int cmd_info(int argc, char **argv) {
   const char *in = argv[1];
   const FileFormat fmt = detect_format(in);
   if (fmt == FileFormat::Jpeg) {
-    return imagecodec_jpeg_info(in);
+    return image_codec_jpeg_info(in);
   }
   if (fmt == FileFormat::Tiff) {
-    return imagecodec_tiff_info(in);
+    return image_codec_tiff_info(in);
   }
   std::fprintf(stderr, "info: unrecognized format (need JPEG or TIFF): %s\n", in);
   return 2;
@@ -140,9 +140,9 @@ int cmd_decode(int argc, char **argv) {
   const FileFormat fmt = detect_format(in);
   switch (fmt) {
     case FileFormat::Jpeg:
-      return imagecodec_jpeg_decode(in, out, backend == 2 ? 1 : 0);
+      return image_codec_jpeg_decode(in, out, backend == 2 ? 1 : 0);
     case FileFormat::Tiff:
-      return imagecodec_tiff_decode(in, out, backend);
+      return image_codec_tiff_decode(in, out, backend);
     default:
       std::fprintf(stderr, "decode: unrecognized format: %s\n", in);
       return 2;
@@ -181,12 +181,12 @@ int cmd_encode(int argc, char **argv) {
   switch (fmt) {
     case FileFormat::Jpeg: {
       const int quality = find_opt_int(argc, argv, "--jpeg-quality", 85);
-      return imagecodec_jpeg_encode(in, out, backend == 2 ? 1 : 0, quality);
+      return image_codec_jpeg_encode(in, out, backend == 2 ? 1 : 0, quality);
     }
     case FileFormat::Tiff: {
       const int compression = find_opt_int(argc, argv, "--tiff-compression", 5);
       const int rows_per_strip = find_opt_int(argc, argv, "--rows-per-strip", 0);
-      return imagecodec_tiff_encode(in, out, backend, compression, rows_per_strip);
+      return image_codec_tiff_encode(in, out, backend, compression, rows_per_strip);
     }
     default:
       std::fprintf(stderr, "encode: unsupported output extension (use .jpg/.jpeg/.tif/.tiff)\n");
@@ -214,20 +214,20 @@ int cmd_bench(int argc, char **argv) {
   }
   // 解码计时（输出写到临时路径；各模块忽略重复写同一文件的代价差异不大）。
   const char *tmp_out = "bench_out.bmp";
-  const long long t0 = imagecodec_now_ns();
+  const long long t0 = image_codec_now_ns();
   for (int i = 0; i < iterations; ++i) {
     int rc = 0;
     if (fmt == FileFormat::Jpeg) {
-      rc = imagecodec_jpeg_decode(in, tmp_out, backend == 2 ? 1 : 0);
+      rc = image_codec_jpeg_decode(in, tmp_out, backend == 2 ? 1 : 0);
     } else {
-      rc = imagecodec_tiff_decode(in, tmp_out, backend);
+      rc = image_codec_tiff_decode(in, tmp_out, backend);
     }
     if (rc != 0) {
       std::fprintf(stderr, "bench: decode failed at iteration %d (rc=%d)\n", i, rc);
       return 1;
     }
   }
-  const long long dt = imagecodec_now_ns() - t0;
+  const long long dt = image_codec_now_ns() - t0;
   const double per = static_cast<double>(dt) / static_cast<double>(iterations) / 1e6;
   std::printf("bench: %s -> %d decodes in %.3f ms total, %.3f ms/decode (%.1f fps)\n",
               in, iterations, static_cast<double>(dt) / 1e6, per,

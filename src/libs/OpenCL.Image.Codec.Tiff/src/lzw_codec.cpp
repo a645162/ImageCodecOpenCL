@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace imagecodec {
+namespace image_codec {
 namespace tiff {
 
 namespace {
@@ -227,4 +227,4 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
 }
 
 }  // namespace tiff
-}  // namespace imagecodec
+}  // namespace image_codec

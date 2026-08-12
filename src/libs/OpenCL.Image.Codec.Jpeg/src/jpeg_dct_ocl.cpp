@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace jpeg {
 
 namespace {
@@ -636,4 +636,4 @@ int jpeg_cpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
 }
 
 }  // namespace jpeg
-}  // namespace imagecodec
+}  // namespace image_codec

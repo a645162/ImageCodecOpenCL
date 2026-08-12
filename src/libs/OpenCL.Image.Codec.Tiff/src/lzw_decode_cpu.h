@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace imagecodec {
+namespace image_codec {
 namespace tiff {
 
 // 解码一段 LZW 压缩数据。
@@ -15,4 +15,4 @@ namespace tiff {
 int lzwDecode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out);
 
 }  // namespace tiff
-}  // namespace imagecodec
+}  // namespace image_codec

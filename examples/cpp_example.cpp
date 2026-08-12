@@ -1,8 +1,8 @@
-// examples/cpp_example.cpp - C++ 示例：使用 imagecodec.hpp RAII 包装。
+// examples/cpp_example.cpp - C++ 示例：使用 image_codec.hpp RAII 包装。
 //
-// 用法：imagecodec_example_cpp <in.bmp> <out-prefix>
+// 用法：image_codec_example_cpp <in.bmp> <out-prefix>
 //   与 c_example.c 等价，但全程 RAII/异常，无需手动释放。
-#include <OpenCLImageCodec/imagecodec.hpp>
+#include <OpenCLImageCodec/image_codec.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -90,18 +90,18 @@ bool write_file(const char *path, const uint8_t *data, size_t size) {
 
 int main(int argc, char **argv) {
   if (argc < 3) {
-    std::fprintf(stderr, "usage: imagecodec_example_cpp <in.bmp> <out-prefix>\n");
+    std::fprintf(stderr, "usage: image_codec_example_cpp <in.bmp> <out-prefix>\n");
     return 2;
   }
   try {
     /* 1. 枚举 OpenCL 设备（RAII，析构自动释放） */
-    imagecodec::DeviceList devs;
+    image_codec::DeviceList devs;
     std::printf("%d OpenCL device(s):\n", devs.size());
     for (int i = 0; i < devs.size(); i++) {
       std::printf("  [%d] %s\n", i, devs.name(i));
     }
 
-    /* 2. 读 BMP -> imagecodec::Image（数据转移给 Image 管理） */
+    /* 2. 读 BMP -> image_codec::Image（数据转移给 Image 管理） */
     std::vector<uint8_t> rgb;
     uint32_t w = 0, h = 0;
     if (!load_bmp(argv[1], &rgb, &w, &h)) {
@@ -114,17 +114,17 @@ int main(int argc, char **argv) {
       return 1;
     }
     std::memcpy(px, rgb.data(), rgb.size());
-    imagecodec::Image img(w, h, 3, px, (size_t)w * 3, rgb.size());
+    image_codec::Image img(w, h, 3, px, (size_t)w * 3, rgb.size());
     std::printf("loaded %s: %ux%u (%zu bytes)\n", argv[1], w, h, rgb.size());
 
     /* 3. 编解码器 + 编码参数 */
-    imagecodec::Codec codec(IMAGECODEC_BACKEND_OPENCL);
-    imagecodec_encode_params params = imagecodec::default_encode_params();
+    image_codec::Codec codec(IMAGE_CODEC_BACKEND_OPENCL);
+    image_codec_encode_params params = image_codec::default_encode_params();
     // params.jpeg_quality = 85; tiff_compression = 5; rows_per_strip = 0。
 
     /* 4a. 编码 TIFF */
     {
-      std::vector<uint8_t> tif = codec.encode(IMAGECODEC_FORMAT_TIFF, img, params);
+      std::vector<uint8_t> tif = codec.encode(IMAGE_CODEC_FORMAT_TIFF, img, params);
       const std::string path = std::string(argv[2]) + ".tif";
       if (!write_file(path.c_str(), tif.data(), tif.size())) {
         std::fprintf(stderr, "cannot write %s\n", path.c_str());
@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
     /* 4b. 编码 JPEG */
     std::vector<uint8_t> jpg;
     {
-      jpg = codec.encode(IMAGECODEC_FORMAT_JPEG, img, params);
+      jpg = codec.encode(IMAGE_CODEC_FORMAT_JPEG, img, params);
       const std::string path = std::string(argv[2]) + ".jpg";
       if (!write_file(path.c_str(), jpg.data(), jpg.size())) {
         std::fprintf(stderr, "cannot write %s\n", path.c_str());
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
 
     /* 5. 解码回读并校验尺寸 */
     {
-      imagecodec::Image dec = codec.decode(IMAGECODEC_FORMAT_JPEG, jpg.data(), jpg.size());
+      image_codec::Image dec = codec.decode(IMAGE_CODEC_FORMAT_JPEG, jpg.data(), jpg.size());
       std::printf("decoded -> %ux%u channels=%u (%zu bytes)\n", dec.width(),
                   dec.height(), dec.channels(), dec.data_size());
       if (dec.width() != w || dec.height() != h) {
@@ -158,25 +158,25 @@ int main(int argc, char **argv) {
       }
     }
 
-    /* 6. 错误路径：垃圾数据解码应抛 imagecodec::Error 而非崩溃 */
+    /* 6. 错误路径：垃圾数据解码应抛 image_codec::Error 而非崩溃 */
     {
       static const uint8_t junk[16] = {0xde, 0xad, 0xbe, 0xef, 1, 2, 3, 4,
                                        5,    6,    7,    8,    9, 10, 11, 12};
       try {
-        imagecodec::Image bad =
-            codec.decode(IMAGECODEC_FORMAT_JPEG, junk, sizeof(junk));
-        std::fprintf(stderr, "expected imagecodec::Error for garbage input\n");
+        image_codec::Image bad =
+            codec.decode(IMAGE_CODEC_FORMAT_JPEG, junk, sizeof(junk));
+        std::fprintf(stderr, "expected image_codec::Error for garbage input\n");
         (void)bad;
         return 1;
-      } catch (const imagecodec::Error &e) {
+      } catch (const image_codec::Error &e) {
         std::printf("error path: decode(garbage) -> %s (%d)\n", e.what(),
                     static_cast<int>(e.status()));
       }
     }
 
     return 0;
-  } catch (const imagecodec::Error &e) {
-    std::fprintf(stderr, "imagecodec error: %s (%d)\n", e.what(),
+  } catch (const image_codec::Error &e) {
+    std::fprintf(stderr, "image_codec error: %s (%d)\n", e.what(),
                  static_cast<int>(e.status()));
     return 1;
   } catch (const std::exception &e) {
