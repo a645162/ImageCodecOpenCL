@@ -2,7 +2,9 @@
 # 每个库提供命名空间别名，例如：
 #   target_link_libraries(app PRIVATE OpenCLImageCodec::Tiff)   # 仅 TIFF（PUBLIC 传播 Core）
 #   target_link_libraries(app PRIVATE OpenCLImageCodec::Jpeg)   # 仅 JPEG（含 Core）
+#   target_link_libraries(app PRIVATE OpenCLImageCodec::Metrics) # 仅画质指标
 add_subdirectory(OpenCL.Image.Codec.Core)     # OpenCLImageCodec::Core       平台抽象 + OpenCL 设备/上下文/kernel
 add_subdirectory(OpenCL.Image.Codec.Tiff)     # OpenCLImageCodec::Tiff       TIFF 容器 + LZW 编码(GPU)/解码(CPU)
 add_subdirectory(OpenCL.Image.Codec.Jpeg)     # OpenCLImageCodec::Jpeg       baseline JPEG 混合编解码（OpenCL）
+add_subdirectory(OpenCL.Image.Codec.Metrics)  # OpenCLImageCodec::Metrics    MSE/PSNR/SSIM/MS-SSIM（GPU + CPU 参考）
 add_subdirectory(OpenCL.Image.Codec.Api)      # OpenCLImageCodec::Api        C API（image_codec.h）实现
