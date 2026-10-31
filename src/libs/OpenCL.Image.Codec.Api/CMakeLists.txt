@@ -12,7 +12,8 @@ target_include_directories(OpenCLImageCodec.Api PUBLIC
 target_link_libraries(OpenCLImageCodec.Api PUBLIC
   OpenCLImageCodec.Core
   OpenCLImageCodec.Tiff
-  OpenCLImageCodec.Jpeg)
+  OpenCLImageCodec.Jpeg
+  OpenCLImageCodec.Metrics)
 # 构建本库时 IMAGE_CODEC_API 取 dllexport 分支（共享库场景）；静态库下为空。
 target_compile_definitions(OpenCLImageCodec.Api PRIVATE IMAGE_CODEC_BUILDING_LIB)
 
