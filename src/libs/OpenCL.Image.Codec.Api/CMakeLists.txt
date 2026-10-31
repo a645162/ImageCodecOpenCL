@@ -2,11 +2,11 @@
 # 桥接各模块文件入口（image_codec_*_test.h）与内存 buffer。
 add_library(OpenCLImageCodec.Api STATIC
   src/image_codec.cpp
-  "${CMAKE_SOURCE_DIR}/include/OpenCLImageCodec/image_codec.h"
-  "${CMAKE_SOURCE_DIR}/include/OpenCLImageCodec/image_codec.hpp")
+  "${PROJECT_SOURCE_DIR}/include/OpenCLImageCodec/image_codec.h"
+  "${PROJECT_SOURCE_DIR}/include/OpenCLImageCodec/image_codec.hpp")
 
 target_include_directories(OpenCLImageCodec.Api PUBLIC
-  "${CMAKE_SOURCE_DIR}/include"
+  "${PROJECT_SOURCE_DIR}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 target_link_libraries(OpenCLImageCodec.Api PUBLIC
