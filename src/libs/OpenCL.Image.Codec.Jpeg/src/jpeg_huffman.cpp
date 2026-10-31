@@ -1,6 +1,7 @@
 // src/jpeg/jpeg_huffman.cpp - CPU 熵编解码实现。
 #include "jpeg_huffman.h"
 
+#include <cmath>
 #include <cstring>
 
 namespace image_codec {
@@ -23,12 +24,12 @@ int JpegBitReader::get_bits(int n) {
       }
       const uint8_t b2 = data_[pos_++];
       if (b2 == 0x00) {
-        b = 0xFF;  // 0xFF00 填充字节 -> 0xFF
+        b = 0xFF; // 0xFF00 填充字节 -> 0xFF
       } else if (b2 >= 0xD0 && b2 <= 0xD7) {
         restart_marker_ = b2 - 0xD0;
         return -1;
       } else {
-        eof_ = true;  // EOI 或其它标记：扫描结束
+        eof_ = true; // EOI 或其它标记：扫描结束
         return -1;
       }
     }
@@ -60,14 +61,14 @@ bool JpegBitReader::consume_restart() {
         return false;
       }
       const uint8_t b2 = data_[pos_++];
-      if (b2 == 0x00) continue;  // 填充字节，继续找
+      if (b2 == 0x00) continue; // 填充字节，继续找
       if (b2 >= 0xD0 && b2 <= 0xD7) {
         restart_marker_ = -1;
         return true;
       }
       eof_ = true;
       restart_marker_ = -1;
-      return false;  // 遇到 EOI 等：缺失 RST
+      return false; // 遇到 EOI 等：缺失 RST
     }
   }
   eof_ = true;
@@ -80,7 +81,7 @@ bool JpegBitReader::consume_restart() {
 namespace {
 
 // 解码一个 Huffman 符号。返回符号值；-1 = 位流中断；-2 = 非法码。
-int decode_symbol(JpegBitReader& br, const JpegHuffmanTable& t) {
+int decode_symbol(JpegBitReader &br, const JpegHuffmanTable &t) {
   int code = 0;
   for (int len = 1; len <= 16; len++) {
     const int bit = br.get_bits(1);
@@ -100,8 +101,8 @@ int extend(int bits, int size) {
 }
 
 // 解码一个 8x8 块。out 需为 64 个 float（自然序），返回 0 成功。
-int decode_block(JpegBitReader& br, const JpegHuffmanTable& dc_t,
-                 const JpegHuffmanTable& ac_t, float* out, int* dc_pred) {
+int decode_block(JpegBitReader &br, const JpegHuffmanTable &dc_t,
+                 const JpegHuffmanTable &ac_t, float *out, int *dc_pred) {
   std::memset(out, 0, 64 * sizeof(float));
   // DC：差分 + 符号扩展
   const int t = decode_symbol(br, dc_t);
@@ -121,15 +122,15 @@ int decode_block(JpegBitReader& br, const JpegHuffmanTable& dc_t,
     const int rs = decode_symbol(br, ac_t);
     if (rs == -1) return -1;
     if (rs == -2) return -2;
-    if (rs == 0x00) break;  // EOB
+    if (rs == 0x00) break; // EOB
     const int run = rs >> 4;
     const int size = rs & 15;
-    if (size == 0) {  // ZRL：16 个零
+    if (size == 0) { // ZRL：16 个零
       k += 16;
       continue;
     }
     k += run;
-    if (k >= 64) return -2;  // 越界
+    if (k >= 64) return -2; // 越界
     const int bits = br.get_bits(size);
     if (bits < 0) return -1;
     out[kJpegZigzag[k]] = static_cast<float>(extend(bits, size));
@@ -138,12 +139,12 @@ int decode_block(JpegBitReader& br, const JpegHuffmanTable& dc_t,
   return 0;
 }
 
-}  // namespace
+} // namespace
 
-int jpeg_entropy_decode(const JpegImage& img, std::vector<float>* coeffs,
-                        std::string* err) {
+int jpeg_entropy_decode(const JpegImage &img, std::vector<float> *coeffs,
+                        std::string *err) {
   coeffs->assign(static_cast<size_t>(img.total_blocks) * 64, 0.f);
-  for (const JpegScanInfo& scan : img.scans) {
+  for (const JpegScanInfo &scan : img.scans) {
     JpegBitReader br(scan.entropy.data(), scan.entropy.size());
     int dc_pred[4] = {0, 0, 0, 0};
 
@@ -162,7 +163,7 @@ int jpeg_entropy_decode(const JpegImage& img, std::vector<float>* coeffs,
           if (err) *err = "missing restart marker";
           return -1;
         }
-        for (const auto& sc : scan.comp) dc_pred[sc.comp_index] = 0;
+        for (const auto &sc : scan.comp) dc_pred[sc.comp_index] = 0;
         mcu_expected = 0;
       }
 
@@ -170,17 +171,17 @@ int jpeg_entropy_decode(const JpegImage& img, std::vector<float>* coeffs,
       if (scan.interleaved) {
         const int mcx = m % img.mcus_x;
         const int mcy = m / img.mcus_x;
-        for (const auto& sc : scan.comp) {
-          const JpegComponentInfo& c = img.comp[sc.comp_index];
+        for (const auto &sc : scan.comp) {
+          const JpegComponentInfo &c = img.comp[sc.comp_index];
           for (int by = 0; by < c.v_samp; by++) {
             for (int bx = 0; bx < c.h_samp; bx++) {
-              float* blk = &(*coeffs)[c.coeff_off +
-                                      ((mcy * c.v_samp + by) * c.blocks_x +
-                                       mcx * c.h_samp + bx) *
-                                          64];
-              const int r = decode_block(br, img.huff_dc[sc.td],
-                                         img.huff_ac[sc.ta], blk,
-                                         &dc_pred[sc.comp_index]);
+              float *blk =
+                  &(*coeffs)[c.coeff_off + ((mcy * c.v_samp + by) * c.blocks_x +
+                                            mcx * c.h_samp + bx) *
+                                               64];
+              const int r =
+                  decode_block(br, img.huff_dc[sc.td], img.huff_ac[sc.ta], blk,
+                               &dc_pred[sc.comp_index]);
               if (r != 0) {
                 block_result = r;
                 break;
@@ -191,12 +192,11 @@ int jpeg_entropy_decode(const JpegImage& img, std::vector<float>* coeffs,
           if (block_result != 0) break;
         }
       } else {
-        const JpegScanInfo::ScanComponent& sc = scan.comp[0];
-        const JpegComponentInfo& c = img.comp[sc.comp_index];
-        float* blk = &(*coeffs)[c.coeff_off + m * 64];
-        block_result =
-            decode_block(br, img.huff_dc[sc.td], img.huff_ac[sc.ta], blk,
-                         &dc_pred[sc.comp_index]);
+        const JpegScanInfo::ScanComponent &sc = scan.comp[0];
+        const JpegComponentInfo &c = img.comp[sc.comp_index];
+        float *blk = &(*coeffs)[c.coeff_off + m * 64];
+        block_result = decode_block(br, img.huff_dc[sc.td], img.huff_ac[sc.ta],
+                                    blk, &dc_pred[sc.comp_index]);
       }
 
       if (block_result == -1) {
@@ -223,7 +223,7 @@ struct HuffEncodeEntry {
   uint8_t len = 0;
 };
 
-void build_encode_table(const JpegHuffmanTable& t, HuffEncodeEntry e[256]) {
+void build_encode_table(const JpegHuffmanTable &t, HuffEncodeEntry e[256]) {
   int code = 0;
   int si = 0;
   for (int len = 1; len <= 16; len++) {
@@ -238,11 +238,12 @@ void build_encode_table(const JpegHuffmanTable& t, HuffEncodeEntry e[256]) {
 }
 
 class JpegBitWriter {
- public:
-  explicit JpegBitWriter(std::vector<uint8_t>* out) : out_(out) {}
+public:
+  explicit JpegBitWriter(std::vector<uint8_t> *out) : out_(out) {}
   void put_bits(int val, int n) {
-    bitbuf_ = (bitbuf_ << n) |
-              static_cast<uint32_t>(val & ((n == 32) ? 0xFFFFFFFFu : ((1u << n) - 1)));
+    bitbuf_ =
+        (bitbuf_ << n) | static_cast<uint32_t>(
+                             val & ((n == 32) ? 0xFFFFFFFFu : ((1u << n) - 1)));
     bitcnt_ += n;
     while (bitcnt_ >= 8) {
       bitcnt_ -= 8;
@@ -255,12 +256,12 @@ class JpegBitWriter {
     while (bitcnt_ > 0) put_bits(1, 1);
   }
 
- private:
+private:
   void emit(uint8_t b) {
     out_->push_back(b);
-    if (b == 0xFF) out_->push_back(0x00);  // 字节填充
+    if (b == 0xFF) out_->push_back(0x00); // 字节填充
   }
-  std::vector<uint8_t>* out_;
+  std::vector<uint8_t> *out_;
   uint32_t bitbuf_ = 0;
   int bitcnt_ = 0;
 };
@@ -276,16 +277,21 @@ int category(int v) {
   return s;
 }
 
-void put_amplitude(JpegBitWriter& bw, int v, int s) {
+void put_amplitude(JpegBitWriter &bw, int v, int s) {
   if (s <= 0) return;
   const int bits = (v >= 0) ? v : (v + (1 << s) - 1);
   bw.put_bits(bits, s);
 }
 
-void encode_block(JpegBitWriter& bw, const float* blk,
-                  const HuffEncodeEntry* dc_e, const HuffEncodeEntry* ac_e,
-                  int* prev_dc) {
-  const int dc = static_cast<int>(blk[0] + 0.5f);
+// 量化系数在 DCT/量化阶段已经取整，以 float 存放。这里必须做**对称四舍五入**：
+// `(int)(v + 0.5f)` 会把负数朝零截断（-5.0 -> -4），使所有负系数整体偏 1——
+// AC 系数大约一半为负，实测这让 q=92 的 PSNR 掉约 5 dB，而且看起来不像 bug。
+int roundCoeff(float v) { return static_cast<int>(std::lround(v)); }
+
+void encode_block(JpegBitWriter &bw, const float *blk,
+                  const HuffEncodeEntry *dc_e, const HuffEncodeEntry *ac_e,
+                  int *prev_dc) {
+  const int dc = roundCoeff(blk[0]);
   const int diff = dc - *prev_dc;
   *prev_dc = dc;
   const int sd = category(diff);
@@ -294,13 +300,13 @@ void encode_block(JpegBitWriter& bw, const float* blk,
 
   int run = 0;
   for (int k = 1; k < 64; k++) {
-    const int v = static_cast<int>(blk[kJpegZigzag[k]] + 0.5f);
+    const int v = roundCoeff(blk[kJpegZigzag[k]]);
     if (v == 0) {
       run++;
       continue;
     }
     while (run >= 16) {
-      bw.put_bits(ac_e[0xF0].code, ac_e[0xF0].len);  // ZRL
+      bw.put_bits(ac_e[0xF0].code, ac_e[0xF0].len); // ZRL
       run -= 16;
     }
     const int s = category(v);
@@ -310,14 +316,14 @@ void encode_block(JpegBitWriter& bw, const float* blk,
     run = 0;
   }
   if (run > 0) {
-    bw.put_bits(ac_e[0x00].code, ac_e[0x00].len);  // EOB
+    bw.put_bits(ac_e[0x00].code, ac_e[0x00].len); // EOB
   }
 }
 
-}  // namespace
+} // namespace
 
-int jpeg_entropy_encode(const JpegImage& img, const std::vector<float>& coeffs,
-                        std::vector<uint8_t>* entropy, std::string* err) {
+int jpeg_entropy_encode(const JpegImage &img, const std::vector<float> &coeffs,
+                        std::vector<uint8_t> *entropy, std::string *err) {
   HuffEncodeEntry dc_e[4][256];
   HuffEncodeEntry ac_e[4][256];
   bool dc_ok[4] = {false, false, false, false};
@@ -343,14 +349,14 @@ int jpeg_entropy_encode(const JpegImage& img, const std::vector<float>& coeffs,
     const int mcx = m % img.mcus_x;
     const int mcy = m / img.mcus_x;
     for (int ci = 0; ci < img.ncomp; ci++) {
-      const JpegComponentInfo& c = img.comp[ci];
+      const JpegComponentInfo &c = img.comp[ci];
       if (!dc_ok[c.td] || !ac_ok[c.ta]) {
         if (err) *err = "missing huffman table for encoding";
         return -1;
       }
       for (int by = 0; by < c.v_samp; by++) {
         for (int bx = 0; bx < c.h_samp; bx++) {
-          const float* blk =
+          const float *blk =
               &coeffs[c.coeff_off + ((mcy * c.v_samp + by) * c.blocks_x +
                                      mcx * c.h_samp + bx) *
                                         64];
@@ -363,5 +369,5 @@ int jpeg_entropy_encode(const JpegImage& img, const std::vector<float>& coeffs,
   return 0;
 }
 
-}  // namespace jpeg
-}  // namespace image_codec
+} // namespace jpeg
+} // namespace image_codec
