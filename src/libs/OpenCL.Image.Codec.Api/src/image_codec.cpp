@@ -93,6 +93,46 @@ bool read_file(const std::string &path, std::vector<uint8_t> *out) {
 
 } // namespace
 
+// 下面这些辅助函数必须放在 extern "C" 之外：C 语言链接的符号没有名字修饰，
+// 放在 extern "C" 里的匿名命名空间并**不会**变成内部链接（GCC 实测会导出
+// `T metricArgsValid`），两个后端的 C API 一起链接时就会在链接期撞车。
+namespace {
+
+bool metricArgsValid(const image_codec_codec *codec, const image_codec_image *a,
+                     const image_codec_image *b) {
+  if (codec == nullptr || a == nullptr || b == nullptr) {
+    return false;
+  }
+  if (a->data == nullptr || b->data == nullptr) {
+    return false;
+  }
+  if (a->width == 0 || a->height == 0 || a->channels == 0) {
+    return false;
+  }
+  return a->width == b->width && a->height == b->height &&
+         a->channels == b->channels;
+}
+
+image_codec::ocl::metrics::ImageView toView(const image_codec_image *img) {
+  image_codec::ocl::metrics::ImageView v;
+  v.data = img->data;
+  v.width = static_cast<int>(img->width);
+  v.height = static_cast<int>(img->height);
+  v.channels = static_cast<int>(img->channels);
+  v.stride = img->stride;
+  return v;
+}
+
+// 后端为 CPU 时走参考实现：语义与编解码一致（CPU 后端 = 不碰设备）。
+image_codec::ocl::metrics::Options
+metricOptions(const image_codec_codec *codec) {
+  image_codec::ocl::metrics::Options opt;
+  opt.use_gpu = codec->backend != IMAGE_CODEC_BACKEND_CPU;
+  return opt;
+}
+
+} // namespace
+
 extern "C" {
 
 // ---- 状态码 ----
@@ -332,42 +372,6 @@ void image_codec_image_free(image_codec_image *img) {
 //
 // 本层只做 image_codec_image -> ImageView 的转换（非拥有视图，不复制像素），
 // 具体实现在 OpenCL.Image.Codec.Metrics 里。
-namespace {
-
-bool metricArgsValid(const image_codec_codec *codec, const image_codec_image *a,
-                     const image_codec_image *b) {
-  if (codec == nullptr || a == nullptr || b == nullptr) {
-    return false;
-  }
-  if (a->data == nullptr || b->data == nullptr) {
-    return false;
-  }
-  if (a->width == 0 || a->height == 0 || a->channels == 0) {
-    return false;
-  }
-  return a->width == b->width && a->height == b->height &&
-         a->channels == b->channels;
-}
-
-image_codec::ocl::metrics::ImageView toView(const image_codec_image *img) {
-  image_codec::ocl::metrics::ImageView v;
-  v.data = img->data;
-  v.width = static_cast<int>(img->width);
-  v.height = static_cast<int>(img->height);
-  v.channels = static_cast<int>(img->channels);
-  v.stride = img->stride;
-  return v;
-}
-
-// 后端为 CPU 时走参考实现：语义与编解码一致（CPU 后端 = 不碰设备）。
-image_codec::ocl::metrics::Options
-metricOptions(const image_codec_codec *codec) {
-  image_codec::ocl::metrics::Options opt;
-  opt.use_gpu = codec->backend != IMAGE_CODEC_BACKEND_CPU;
-  return opt;
-}
-
-} // namespace
 
 image_codec_status image_codec_metric_mse(image_codec_codec *codec,
                                           const image_codec_image *a,
