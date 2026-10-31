@@ -17,6 +17,7 @@
 #include "OpenCLImageCodec/image_codec.h"
 
 #include "../../OpenCL.Image.Codec.Core/src/ocl_device.h"
+#include "../../OpenCL.Image.Codec.Core/src/ocl_program.h"
 #include "../../OpenCL.Image.Codec.Common/src/image_buffer.h"
 #include "../../OpenCL.Image.Codec.Jpeg/src/jpeg_codec.h"
 #include "../../OpenCL.Image.Codec.Png/src/png_codec.h"
@@ -363,6 +364,101 @@ void image_codec_image_free(image_codec_image *img) {
     std::free(img->data);
   }
   std::memset(img, 0, sizeof(*img));
+}
+
+image_codec_status image_codec_codec_gpu_stage(image_codec_codec *codec,
+                                               const image_codec_image *in,
+                                               image_codec_image *out) {
+  if (codec == nullptr || in == nullptr || out == nullptr || in->data == nullptr ||
+      in->width == 0 || in->height == 0 || in->channels == 0 ||
+      in->channels > 4) {
+    return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
+  }
+  if (codec->backend == IMAGE_CODEC_BACKEND_CPU) {
+    return IMAGE_CODEC_ERR_BACKEND_UNAVAILABLE;
+  }
+  std::memset(out, 0, sizeof(*out));
+  const size_t row_bytes = static_cast<size_t>(in->width) * in->channels;
+  const size_t bytes = row_bytes * in->height;
+  std::vector<uint8_t> packed;
+  const uint8_t *source = in->data;
+  if (in->stride != 0 && in->stride != row_bytes) {
+    packed.resize(bytes);
+    for (uint32_t y = 0; y < in->height; ++y) {
+      std::memcpy(packed.data() + static_cast<size_t>(y) * row_bytes,
+                  in->data + static_cast<size_t>(y) * in->stride, row_bytes);
+    }
+    source = packed.data();
+  }
+
+  image_codec::OclDevice device;
+  if (device.init() != CL_SUCCESS) return IMAGE_CODEC_ERR_BACKEND_UNAVAILABLE;
+  static constexpr const char *kCopyKernel = R"CLC(
+__kernel void copy_tiles(__global const uchar* src, __global uchar* dst,
+                         uint count) {
+  const uint i = (uint)get_global_id(0);
+  if (i < count) dst[i] = src[i];
+}
+)CLC";
+  cl_program program = nullptr;
+  std::string build_log;
+  cl_int err = image_codec::OclProgram::build(
+      device.context(), device.device(), kCopyKernel, "", &program, &build_log);
+  if (err != CL_SUCCESS) return IMAGE_CODEC_ERR_INTERNAL;
+  cl_kernel kernel = nullptr;
+  err = image_codec::OclProgram::createKernel(program, "copy_tiles", &kernel);
+  if (err != CL_SUCCESS) {
+    image_codec::OclProgram::release(program);
+    return IMAGE_CODEC_ERR_INTERNAL;
+  }
+  cl_mem src = clCreateBuffer(device.context(), CL_MEM_READ_ONLY |
+                                  CL_MEM_COPY_HOST_PTR,
+                              bytes, const_cast<uint8_t *>(source), &err);
+  cl_mem dst = err == CL_SUCCESS
+                   ? clCreateBuffer(device.context(), CL_MEM_WRITE_ONLY, bytes,
+                                    nullptr, &err)
+                   : nullptr;
+  if (err != CL_SUCCESS || src == nullptr || dst == nullptr) {
+    if (src != nullptr) clReleaseMemObject(src);
+    if (dst != nullptr) clReleaseMemObject(dst);
+    image_codec::OclProgram::release(kernel);
+    image_codec::OclProgram::release(program);
+    return (err == CL_MEM_OBJECT_ALLOCATION_FAILURE ||
+            err == CL_OUT_OF_RESOURCES || err == CL_OUT_OF_HOST_MEMORY)
+               ? IMAGE_CODEC_ERR_OUT_OF_MEMORY
+               : IMAGE_CODEC_ERR_INTERNAL;
+  }
+  const cl_uint count = static_cast<cl_uint>(bytes);
+  err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &src);
+  err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &dst);
+  err |= clSetKernelArg(kernel, 2, sizeof(cl_uint), &count);
+  const size_t global = bytes;
+  if (err == CL_SUCCESS)
+    err = clEnqueueNDRangeKernel(device.queue(), kernel, 1, nullptr, &global,
+                                 nullptr, 0, nullptr, nullptr);
+  std::vector<uint8_t> result(bytes);
+  if (err == CL_SUCCESS)
+    err = clEnqueueReadBuffer(device.queue(), dst, CL_TRUE, 0, bytes,
+                              result.data(), 0, nullptr, nullptr);
+  clReleaseMemObject(src);
+  clReleaseMemObject(dst);
+  image_codec::OclProgram::release(kernel);
+  image_codec::OclProgram::release(program);
+  if (err != CL_SUCCESS) {
+    return (err == CL_MEM_OBJECT_ALLOCATION_FAILURE ||
+            err == CL_OUT_OF_RESOURCES || err == CL_OUT_OF_HOST_MEMORY)
+               ? IMAGE_CODEC_ERR_OUT_OF_MEMORY
+               : IMAGE_CODEC_ERR_INTERNAL;
+  }
+  out->width = in->width;
+  out->height = in->height;
+  out->channels = in->channels;
+  out->stride = row_bytes;
+  out->data_size = bytes;
+  out->data = static_cast<uint8_t *>(std::malloc(bytes));
+  if (out->data == nullptr) return IMAGE_CODEC_ERR_OUT_OF_MEMORY;
+  std::memcpy(out->data, result.data(), bytes);
+  return IMAGE_CODEC_OK;
 }
 
 // ---- 画质指标 ----

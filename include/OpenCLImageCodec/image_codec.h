@@ -122,6 +122,12 @@ IMAGE_CODEC_API image_codec_status image_codec_codec_encode(
     const image_codec_image *img, const image_codec_encode_params *params,
     uint8_t *out, size_t *out_len, size_t out_capacity);
 
+// 将像素分块送入 OpenCL 再读回宿主内存。该入口不改变样本值，供上层
+// Hybrid CPU/GPU 编解码路径验证 GPU staging；码流编解码仍由上层 CPU 库完成。
+IMAGE_CODEC_API image_codec_status image_codec_codec_gpu_stage(
+    image_codec_codec *codec, const image_codec_image *in,
+    image_codec_image *out);
+
 // 释放 image_codec_image（含 data）。NULL 安全。
 IMAGE_CODEC_API void image_codec_image_free(image_codec_image *img);
 
