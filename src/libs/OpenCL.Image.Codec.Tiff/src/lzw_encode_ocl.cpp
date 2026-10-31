@@ -12,10 +12,10 @@
 // 内嵌 kernel 源码（由 CMake file(READ)+configure_file 生成）。
 namespace image_codec {
 namespace tiff {
-extern const char* lzw_encode_cl_source;
-extern const char* lzw_encode_tile_cl_source;
-}  // namespace tiff
-}  // namespace image_codec
+extern const char *lzw_encode_cl_source;
+extern const char *lzw_encode_tile_cl_source;
+} // namespace tiff
+} // namespace image_codec
 
 namespace image_codec {
 namespace tiff {
@@ -23,7 +23,7 @@ namespace tiff {
 namespace {
 
 // 组装错误信息并打印一行诊断。
-std::string makeErr(const char* what, cl_int err, const std::string& log) {
+std::string makeErr(const char *what, cl_int err, const std::string &log) {
   char buf[512];
   std::snprintf(buf, sizeof(buf), "%s: %s", what, OclProgram::errorName(err));
   std::string s = buf;
@@ -33,7 +33,7 @@ std::string makeErr(const char* what, cl_int err, const std::string& log) {
   return s;
 }
 
-}  // namespace
+} // namespace
 
 LzwEncodeOcl::LzwEncodeOcl(int device_index) : device_index_(device_index) {}
 
@@ -59,8 +59,8 @@ bool LzwEncodeOcl::initOnce() {
   device_id_ = dev_.device();
 
   std::string log;
-  err = OclProgram::build(ctx_, device_id_, lzw_encode_cl_source, "-cl-std=CL1.2",
-                          &strip_program_, &log);
+  err = OclProgram::build(ctx_, device_id_, lzw_encode_cl_source,
+                          "-cl-std=CL1.2", &strip_program_, &log);
   if (err != CL_SUCCESS) {
     setError(makeErr("strip kernel 编译失败", err, log));
     return false;
@@ -79,8 +79,9 @@ size_t LzwEncodeOcl::computeBlockCap(size_t unit_bytes, size_t max_unit) const {
   clGetDeviceInfo(device_id_, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(max_alloc),
                   &max_alloc, nullptr);
   const size_t per_unit = unit_bytes + max_unit;
-  size_t cap = 512;  // 默认分块上限
-  if (per_unit > 0) cap = std::min(cap, static_cast<size_t>(max_alloc / per_unit));
+  size_t cap = 512; // 默认分块上限
+  if (per_unit > 0)
+    cap = std::min(cap, static_cast<size_t>(max_alloc / per_unit));
   // dict 缓冲区：cap * 4096 * 4 字节
   cap = std::min(cap, static_cast<size_t>(max_alloc / (4096ull * 4)));
   cap = std::max<size_t>(cap, 1);
@@ -95,20 +96,21 @@ void LzwEncodeOcl::releaseBuffers() {
   sizes_mem_ = out_mem_ = dict_mem_ = in_mem_ = nullptr;
 }
 
-int LzwEncodeOcl::encodeStrips(const uint8_t* rgb, int width, int height,
-                               int rows_per_strip,
-                               std::vector<uint32_t>& out_sizes,
-                               std::vector<uint8_t>& out_data) {
+int LzwEncodeOcl::encodeStrips(const uint8_t *rgb, int width, int height,
+                               int channels, int rows_per_strip,
+                               std::vector<uint32_t> &out_sizes,
+                               std::vector<uint8_t> &out_data) {
   out_sizes.clear();
   out_data.clear();
   if (!initOnce()) return -1;
-  if (rgb == nullptr || width <= 0 || height <= 0 || rows_per_strip <= 0 ||
-      height % rows_per_strip != 0) {
+  if (rgb == nullptr || width <= 0 || height <= 0 || channels < 1 ||
+      channels > 4 || rows_per_strip <= 0 || height % rows_per_strip != 0) {
     setError("encodeStrips: 参数非法（rows_per_strip 须整除 height）");
     return -2;
   }
 
-  const size_t row_bytes = static_cast<size_t>(width) * 3;
+  const size_t row_bytes =
+      static_cast<size_t>(width) * static_cast<size_t>(channels);
   const size_t strip_bytes = static_cast<size_t>(rows_per_strip) * row_bytes;
   const size_t max_strip = strip_bytes * 3 / 2 + 64;
   const size_t n_strips = static_cast<size_t>(height) / rows_per_strip;
@@ -154,7 +156,8 @@ int LzwEncodeOcl::encodeStrips(const uint8_t* rgb, int width, int height,
                          rgb + byte_off, 0, nullptr, nullptr);
     const cl_uint zero32 = 0;
     clEnqueueFillBuffer(queue_, dict_mem_, &zero32, sizeof(zero32), 0,
-                        block_cap * 4096 * sizeof(cl_uint), 0, nullptr, nullptr);
+                        block_cap * 4096 * sizeof(cl_uint), 0, nullptr,
+                        nullptr);
 
     cl_uint ns = static_cast<cl_uint>(bstrips);
     clSetKernelArg(strip_kernel_, 0, sizeof(cl_mem), &in_mem_);
@@ -211,13 +214,15 @@ int LzwEncodeOcl::encodeStrips(const uint8_t* rgb, int width, int height,
   return 0;
 }
 
-int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
-                              int tile_size, std::vector<uint32_t>& out_sizes,
-                              std::vector<uint8_t>& out_data) {
+int LzwEncodeOcl::encodeTiles(const uint8_t *rgb, int width, int height,
+                              int channels, int tile_size,
+                              std::vector<uint32_t> &out_sizes,
+                              std::vector<uint8_t> &out_data) {
   out_sizes.clear();
   out_data.clear();
   if (!initOnce()) return -1;
-  if (rgb == nullptr || width <= 0 || height <= 0 || tile_size <= 0) {
+  if (rgb == nullptr || width <= 0 || height <= 0 || channels < 1 ||
+      channels > 4 || tile_size <= 0) {
     setError("encodeTiles: 参数非法");
     return -2;
   }
@@ -234,9 +239,8 @@ int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
     char opts[128];
     std::snprintf(opts, sizeof(opts), "-cl-std=CL1.2 -DTILE_H=%d", tile_size);
     std::string log;
-    cl_int err =
-        OclProgram::build(ctx_, device_id_, lzw_encode_tile_cl_source, opts,
-                          &tile_program_, &log);
+    cl_int err = OclProgram::build(ctx_, device_id_, lzw_encode_tile_cl_source,
+                                   opts, &tile_program_, &log);
     if (err != CL_SUCCESS) {
       setError(makeErr("tile kernel 编译失败", err, log));
       return -3;
@@ -253,24 +257,26 @@ int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
   const size_t ts = static_cast<size_t>(tile_size);
   const size_t padded_w = ((static_cast<size_t>(width) + ts - 1) / ts) * ts;
   const size_t padded_h = ((static_cast<size_t>(height) + ts - 1) / ts) * ts;
-  const size_t padded_row_bytes = padded_w * 3;
+  const size_t padded_row_bytes = padded_w * static_cast<size_t>(channels);
   const size_t tiles_per_row = padded_w / ts;
   const size_t n_tiles = tiles_per_row * (padded_h / ts);
-  const size_t tile_bytes = ts * ts * 3;
+  const size_t tile_bytes = ts * ts * static_cast<size_t>(channels);
   const size_t max_tile = tile_bytes * 3 / 2 + 64;
   const size_t block_cap = computeBlockCap(tile_bytes, max_tile);
   const size_t n_blocks = (n_tiles + block_cap - 1) / block_cap;
 
   // 填充图像。
   std::vector<uint8_t> padded(padded_row_bytes * padded_h, 0);
-  const size_t src_row_bytes = static_cast<size_t>(width) * 3;
+  const size_t src_row_bytes =
+      static_cast<size_t>(width) * static_cast<size_t>(channels);
   for (size_t r = 0; r < static_cast<size_t>(height); ++r) {
     std::memcpy(padded.data() + r * padded_row_bytes, rgb + r * src_row_bytes,
                 src_row_bytes);
   }
 
   cl_int err = CL_SUCCESS;
-  in_mem_ = clCreateBuffer(ctx_, CL_MEM_READ_ONLY, padded.size(), nullptr, &err);
+  in_mem_ =
+      clCreateBuffer(ctx_, CL_MEM_READ_ONLY, padded.size(), nullptr, &err);
   if (err != CL_SUCCESS) {
     setError(makeErr("创建 tile 输入缓冲失败", err, ""));
     releaseBuffers();
@@ -303,7 +309,8 @@ int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
   clFinish(queue_);
 
   const cl_uint c_padded_row_bytes = static_cast<cl_uint>(padded_row_bytes);
-  const cl_uint c_tile_px_bytes = static_cast<cl_uint>(ts * 3);
+  const cl_uint c_tile_px_bytes =
+      static_cast<cl_uint>(ts * static_cast<size_t>(channels));
   const cl_uint c_tiles_per_row = static_cast<cl_uint>(tiles_per_row);
   const cl_uint c_n_tiles = static_cast<cl_uint>(n_tiles);
   const cl_uint c_max_tile = static_cast<cl_uint>(max_tile);
@@ -312,7 +319,8 @@ int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
     const size_t bt = std::min(block_cap, n_tiles - b * block_cap);
     const cl_uint zero32 = 0;
     clEnqueueFillBuffer(queue_, dict_mem_, &zero32, sizeof(zero32), 0,
-                        block_cap * 4096 * sizeof(cl_uint), 0, nullptr, nullptr);
+                        block_cap * 4096 * sizeof(cl_uint), 0, nullptr,
+                        nullptr);
 
     const cl_uint tile_base = static_cast<cl_uint>(b * block_cap);
     clSetKernelArg(tile_kernel_, 0, sizeof(cl_mem), &in_mem_);
@@ -372,5 +380,5 @@ int LzwEncodeOcl::encodeTiles(const uint8_t* rgb, int width, int height,
   return 0;
 }
 
-}  // namespace tiff
-}  // namespace image_codec
+} // namespace tiff
+} // namespace image_codec

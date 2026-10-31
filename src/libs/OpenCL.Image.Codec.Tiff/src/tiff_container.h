@@ -25,6 +25,10 @@ enum TiffTag : uint16_t {
   kTagTileLength = 323,
   kTagTileOffsets = 324,
   kTagTileByteCounts = 325,
+  // ExtraSamples 是「spp 里多出来那几个样本是什么」的唯一权威说明。
+  // 不写它时，带 Alpha 的 4 通道文件会被解码器当成 CMYK（spp=4 + Photometric=2），
+  // 于是同一份字节被解释成完全不同的颜色。
+  kTagExtraSamples = 338,
 };
 
 enum TiffType : uint16_t {
@@ -38,6 +42,16 @@ enum TiffType : uint16_t {
 enum TiffCompressionValue : uint16_t {
   kCompressionNone = 1,
   kCompressionLzw = 5,
+};
+
+// ExtraSamples 的取值（TIFF 6.0 §ExtraSamples）：
+//   0 = 未指定、1 = 关联 Alpha（预乘）、2 = 非关联 Alpha（直通）。
+// 本库写出恒为 2（不预乘），读入时 0/1/2 都当作「有一个 Alpha 样本」，
+// 因为「多出来一个样本」这件事本身已经由 spp 决定，语义差别留给上层。
+enum TiffExtraSampleValue : uint16_t {
+  kExtraUnspecified = 0,
+  kExtraAssociatedAlpha = 1,
+  kExtraUnassociatedAlpha = 2,
 };
 
 // TIFF 字段类型字节数；未知类型返回 0。
@@ -85,6 +99,9 @@ public:
   // 图像元数据（bps=每样本位数；spp=样本/像素；photometric/compression/planar）。
   bool imageInfo(int &w, int &h, int &spp, int &bps, int &photometric,
                  int &compression, int &planar) const;
+
+  // 是否存在 Alpha 额外样本（ExtraSamples 至少一项）。
+  bool hasExtraSamples() const;
 
   // 布局信息：是 tile 布局还是 strip 布局。
   bool isTiled() const {
@@ -149,9 +166,9 @@ public:
   void reset();
 
   // strip 布局。compression: 1=none, 5=LZW。n_strips 个 strip。
-  // samples_per_pixel：1 = 灰度（Photometric=BlackIsZero），3 = RGB（Photometric=RGB）。
-  // 这个参数决定 BitsPerSample / SamplesPerPixel / Photometric 三个 tag，
-  // 因此**必须**与调用方实际写出的字节排布一致，不能在外面再猜一次。
+  // samples_per_pixel：1 = 灰度、2 = 灰度+Alpha、3 = RGB、4 = RGBA。
+  // 这个参数决定 BitsPerSample / SamplesPerPixel / Photometric / ExtraSamples
+  // 四个 tag，因此**必须**与调用方实际写出的字节排布一致，不能在外面再猜一次。
   bool openStrip(int w, int h, int rows_per_strip, uint16_t compression,
                  size_t n_strips, int samples_per_pixel = 3);
   // tile 布局（TileWidth/TileLength/TileOffsets/TileByteCounts）。
@@ -163,7 +180,8 @@ public:
   bool appendTile(size_t idx, const void *data, size_t size);
 
   bool saveFile(const char *path) const;
-  const std::vector<uint8_t> &buffer() const { return buf_; }
+  // 组装后的完整文件字节。首次访问时才 build()（与 saveFile 同一套惰性逻辑）。
+  const std::vector<uint8_t> &buffer() const;
   size_t payloadBytes() const { return data_end_ - data_start_; }
 
 private:

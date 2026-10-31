@@ -56,13 +56,16 @@ typedef enum image_codec_format {
 } image_codec_format;
 
 // 解码产物/编码输入：top-down 行序（第 0 行为图像顶部）。
-// channels == 1（灰度）或 3（RGB）。**通道保真**：1 通道源解出来仍是 1 通道，
-// 绝不静默升维成 3 通道。
+// channels：1 = 灰度、2 = 灰度+Alpha、3 = RGB、4 = RGBA，Alpha 一律是**非预乘**
+// 的原始样本（本库不做合成）。
+// **通道保真**：1 通道源解出来仍是 1 通道，4 通道源的 Alpha 也不会被悄悄丢掉。
+// 各格式的实际能力：PNG / TIFF 支持 1..4；JPEG 没有 Alpha 样本，只接受 1 或 3，
+// 2/4 返回 IMAGE_CODEC_ERR_UNSUPPORTED_FORMAT（不会降维冒充成功）。
 // data 指向 width*height*channels 字节；stride 为每行字节数（通常 = width*channels）。
 typedef struct image_codec_image {
   uint32_t width;
   uint32_t height;
-  uint32_t channels; // 1 = 灰度, 3 = RGB
+  uint32_t channels; // 1 = 灰度, 2 = 灰度+A, 3 = RGB, 4 = RGBA
   uint8_t *data;     // malloc'd，由 image_codec_image_free 释放
   size_t stride;     // 每行字节数
   size_t data_size;  // 像素数据字节数

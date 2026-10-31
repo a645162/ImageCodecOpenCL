@@ -14,7 +14,9 @@
 - **PNG**（8-bit，非隔行，color type 0/2/4/6）
   - GPU（OpenCL）：行滤波与自适应滤波器选择（两个 kernel：逐行滤波 + 每行 5 种 filter 的残差绝对值和）。
   - CPU：chunk/CRC 与 zlib deflate/inflate；GPU 不可用时回退同一套 CPU 参考实现，并记录原因。
-- **通道保真**：1 通道（灰度）进就 1 通道出，TIFF/PNG/JPEG 与 C API 全链路不做隐式升维。
+- **通道保真**：1/2/3/4 通道（灰度 / 灰度+A / RGB / RGBA）在 TIFF、PNG 与 C API
+  全链路原样往返，不做隐式升维、不丢 Alpha。JPEG 没有 Alpha 样本，2/4 通道返回
+  `UNSUPPORTED_FORMAT`（不降维冒充成功）。
 
 ## 构建
 

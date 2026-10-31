@@ -224,6 +224,11 @@ bool TiffReader::imageInfo(int &w, int &h, int &spp, int &bps, int &photometric,
   return true;
 }
 
+bool TiffReader::hasExtraSamples() const {
+  uint16_t v = 0;
+  return getU16(kTagExtraSamples, v);
+}
+
 bool TiffReader::getStripInfo(std::vector<uint32_t> &offsets,
                               std::vector<uint32_t> &counts,
                               uint32_t &rows_per_strip) const {
@@ -331,7 +336,8 @@ bool TiffWriter::openStrip(int w, int h, int rows_per_strip,
                            int samples_per_pixel) {
   reset();
   if (w <= 0 || h <= 0 || rows_per_strip <= 0 || n_strips == 0) return false;
-  if (samples_per_pixel != 1 && samples_per_pixel != 3) return false;
+  // 1 = 灰度、2 = 灰度+A、3 = RGB、4 = RGBA（后两者的第 4 个样本写 ExtraSamples）。
+  if (samples_per_pixel < 1 || samples_per_pixel > 4) return false;
   tiled_ = false;
   w_ = w;
   h_ = h;
@@ -350,7 +356,7 @@ bool TiffWriter::openTile(int w, int h, uint32_t tile_w, uint32_t tile_h,
   reset();
   if (w <= 0 || h <= 0 || tile_w == 0 || tile_h == 0 || n_tiles == 0)
     return false;
-  if (samples_per_pixel != 1 && samples_per_pixel != 3) return false;
+  if (samples_per_pixel < 1 || samples_per_pixel > 4) return false;
   tiled_ = true;
   w_ = w;
   h_ = h;
@@ -395,18 +401,26 @@ void TiffWriter::putU32(size_t at, uint32_t v) {
 }
 
 void TiffWriter::build() {
-  const size_t n_tags = tiled_ ? 11 : 10;
+  // ExtraSamples 只在「多出来的样本是 Alpha」时出现：spp=2（灰度+A）与
+  // spp=4（RGB+A）。spp=3 是纯 RGB，没有多出来的样本；spp>4 本库不支持。
+  const bool has_extra = (spp_ == 2 || spp_ == 4);
+  const size_t n_tags = (tiled_ ? 11 : 10) + (has_extra ? 1 : 0);
   const size_t ifd_size = 2 + n_tags * 12 + 4;
 
-  // BitsPerSample 只有多采样（spp>1）时才需要数组区；灰度 spp==1 时 count==1，
-  // 值 8 直接写进 Value 字段（TIFF 规范对 count==1 的 SHORT 允许内联）。
-  const bool multi_sample = spp_ > 1;
+  // BitsPerSample 需要数组区的条件是「数组总字节数 > 4」，即 spp >= 3。
+  // spp==1（1 个 SHORT）与 spp==2（2 个 SHORT，恰好 4 字节）都必须内联进
+  // Value 字段。曾经按 spp>1 统一走数组，于是 spp==2 时 Value 存的是数组偏移
+  // 146，而按 TIFF 规范读回来会被当成「位深 146」，解码器直接拒绝。
+  const bool bps_array = spp_ >= 3;
   size_t off = 8 + ifd_size;
   size_t off_bps = 0;
-  if (multi_sample) {
+  if (bps_array) {
     off_bps = off;
     off += static_cast<size_t>(spp_) * 2;
   }
+  const uint32_t bps_value =
+      spp_ == 1 ? 8u
+                : (spp_ == 2 ? 0x00080008u : static_cast<uint32_t>(off_bps));
   // LONG 型偏移/计数数组按 4 字节对齐（灰度少一段 BitsPerSample 数组时会错位）。
   off = (off + 3) & ~static_cast<size_t>(3);
   const size_t off_off = off;
@@ -449,11 +463,11 @@ void TiffWriter::build() {
     entry(kTagImageWidth, kTypeLong, 1, static_cast<uint32_t>(w_));
     entry(kTagImageLength, kTypeLong, 1, static_cast<uint32_t>(h_));
     entry(kTagBitsPerSample, kTypeShort, static_cast<uint32_t>(spp_),
-          multi_sample ? static_cast<uint32_t>(off_bps) : 8u);
+          bps_value);
     entry(kTagCompression, kTypeShort, 1, compression_);
     // Photometric：1 = BlackIsZero（灰度），2 = RGB。写错这个 tag 会让解码器
-    // 把单通道数据当成红色通道。
-    entry(kTagPhotometric, kTypeShort, 1, spp_ == 1 ? 1u : 2u);
+    // 把单通道数据当成红色通道；而 spp==4 少写 ExtraSamples 会被当成 CMYK。
+    entry(kTagPhotometric, kTypeShort, 1, spp_ <= 2 ? 1u : 2u);
     entry(kTagStripOffsets, kTypeLong, static_cast<uint32_t>(n_),
           static_cast<uint32_t>(n_ == 1 ? data_start_ + offs_[0] : off_off));
     entry(kTagSamplesPerPixel, kTypeShort, 1, static_cast<uint32_t>(spp_));
@@ -466,7 +480,7 @@ void TiffWriter::build() {
     entry(kTagImageWidth, kTypeLong, 1, static_cast<uint32_t>(w_));
     entry(kTagImageLength, kTypeLong, 1, static_cast<uint32_t>(h_));
     entry(kTagBitsPerSample, kTypeShort, static_cast<uint32_t>(spp_),
-          multi_sample ? static_cast<uint32_t>(off_bps) : 8u);
+          bps_value);
     entry(kTagCompression, kTypeShort, 1, compression_);
     entry(kTagPhotometric, kTypeShort, 1, spp_ == 1 ? 1u : 2u);
     entry(kTagSamplesPerPixel, kTypeShort, 1, static_cast<uint32_t>(spp_));
@@ -478,10 +492,18 @@ void TiffWriter::build() {
     entry(kTagTileByteCounts, kTypeLong, static_cast<uint32_t>(n_),
           static_cast<uint32_t>(n_ == 1 ? sizes_[0] : off_cnt));
   }
+
+  // ExtraSamples 的 tag 号（338）大于上面所有 tag，因此统一追加在最后，
+  // 保证 IFD 里的 tag 严格升序（部分解码器依赖这一点做二分查找）。
+  // count == 1：本库最多只有一个额外样本（Alpha）；值 2 = 非关联（不预乘）。
+  if (has_extra) {
+    entry(kTagExtraSamples, kTypeShort, 1, kExtraUnassociatedAlpha);
+  }
+
   putU32(e, 0); // next IFD
 
-  // BitsPerSample {8,...}（仅多采样时存在数组区）
-  if (multi_sample) {
+  // BitsPerSample {8,...}（仅 spp>=3 时需要数组区）
+  if (bps_array) {
     for (int k = 0; k < spp_; ++k) {
       putU16(off_bps + static_cast<size_t>(k) * 2, 8);
     }
@@ -497,6 +519,14 @@ void TiffWriter::build() {
   if (!data_.empty()) {
     std::memcpy(buf_.data() + data_start_, data_.data(), data_.size());
   }
+}
+
+const std::vector<uint8_t> &TiffWriter::buffer() const {
+  // build() 是写 buf_ 的惰性步骤；调用方拿到 buffer() 时文件头还没算出来，
+  // 直接返回空 vector 会让「编码成功但产物是空」这种最坏的 bug 悄悄通过。
+  TiffWriter *self = const_cast<TiffWriter *>(this);
+  if (self->buf_.empty() && !self->offs_.empty()) self->build();
+  return buf_;
 }
 
 bool TiffWriter::saveFile(const char *path) const {

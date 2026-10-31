@@ -1,18 +1,18 @@
 // src/api/image_codec.cpp - 对外 C API 实现。
 //
-// 模块文件入口（image_codec_*_decode/encode，见各 *_test.h）接受文件路径，
-// 本层做内存 buffer <-> 临时文件的桥接：
-//   decode: buffer -> 临时输入文件 -> 模块解码 -> 临时 BMP -> image_codec_image
-//   encode: image_codec_image -> 临时 BMP -> 模块编码 -> 输出文件 -> buffer
-// 临时文件放在系统临时目录（Windows GetTempPathA/GetTempFileNameA）。
+// 本层直接调用各模块的**内存缓冲**入口（png::decodePng / tiffDecodeFromBuffer /
+// jpeg_decode_buffer 等），不再经过临时 BMP 落盘：
+//   * 中间文件的代价随图像线性增长（1.9 GB 的图要白写白读一遍），而收益是零；
+//   * BMP 表达不了 2 通道（灰度+Alpha），落盘一轮就会让 RGBA 这条路断掉。
+// 文件级入口（image_codec_*_decode/encode，见各 *_test.h）仍然保留，
+// 它们只是 CLI 的便捷封装，不是 C API 的通路。
 #include "OpenCLImageCodec/image_codec.h"
 
 #include "../../OpenCL.Image.Codec.Core/src/ocl_device.h"
-#include "../../OpenCL.Image.Codec.Common/src/bmp_io.h"
 #include "../../OpenCL.Image.Codec.Common/src/image_buffer.h"
-#include "../../OpenCL.Image.Codec.Jpeg/src/jpeg_test.h"
-#include "../../OpenCL.Image.Codec.Png/src/png_test.h"
-#include "../../OpenCL.Image.Codec.Tiff/src/tiff_test.h"
+#include "../../OpenCL.Image.Codec.Jpeg/src/jpeg_codec.h"
+#include "../../OpenCL.Image.Codec.Png/src/png_codec.h"
+#include "../../OpenCL.Image.Codec.Tiff/src/lzw_codec.h"
 #include "../../OpenCL.Image.Codec.Metrics/src/metrics.h"
 
 #include <cstdio>
@@ -20,14 +20,6 @@
 #include <cstring>
 #include <string>
 #include <vector>
-
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 using image_codec::OclDevice;
 using image_codec::OclDeviceInfo;
@@ -39,58 +31,12 @@ struct image_codec_codec {
 
 namespace {
 
-// 在系统临时目录创建一个唯一临时文件路径（文件已被创建，可 fopen 覆盖写）。
-bool make_temp_path(std::string *out) {
-#if defined(_WIN32)
-  char dir[MAX_PATH];
-  const DWORD n = GetTempPathA(MAX_PATH, dir);
-  if (n == 0 || n >= MAX_PATH) {
-    return false;
-  }
-  char path[MAX_PATH];
-  if (GetTempFileNameA(dir, "image_codec", 0, path) == 0) {
-    return false;
-  }
-  *out = path;
+// 2 通道（灰度+Alpha）只有 PNG / TIFF 能表示；JPEG 没有 Alpha，必须在进后端
+// 之前就明确拒绝，而不是把 Alpha 丢掉装作成功。
+bool channelsAllowed(image_codec_format format, int channels) {
+  if (channels < 1 || channels > 4) return false;
+  if (format == IMAGE_CODEC_FORMAT_JPEG) return channels == 1 || channels == 3;
   return true;
-#else
-  char tmpl[] = "/tmp/image_codec_XXXXXX";
-  int fd = ::mkstemp(tmpl);
-  if (fd < 0) {
-    return false;
-  }
-  ::close(fd);
-  *out = tmpl;
-  return true;
-#endif
-}
-
-bool write_file(const std::string &path, const uint8_t *data, size_t size) {
-  FILE *f = std::fopen(path.c_str(), "wb");
-  if (f == nullptr) {
-    return false;
-  }
-  const size_t n = std::fwrite(data, 1, size, f);
-  std::fclose(f);
-  return n == size;
-}
-
-bool read_file(const std::string &path, std::vector<uint8_t> *out) {
-  FILE *f = std::fopen(path.c_str(), "rb");
-  if (f == nullptr) {
-    return false;
-  }
-  std::fseek(f, 0, SEEK_END);
-  const long sz = std::ftell(f);
-  std::fseek(f, 0, SEEK_SET);
-  if (sz < 0) {
-    std::fclose(f);
-    return false;
-  }
-  out->resize(static_cast<size_t>(sz));
-  const size_t n = std::fread(out->data(), 1, out->size(), f);
-  std::fclose(f);
-  return n == out->size();
 }
 
 } // namespace
@@ -199,64 +145,64 @@ image_codec_status image_codec_codec_decode(image_codec_codec *codec,
   }
   std::memset(out, 0, sizeof(*out));
 
-  std::string in_path, out_bmp;
-  if (!make_temp_path(&in_path) || !make_temp_path(&out_bmp)) {
-    return IMAGE_CODEC_ERR_IO;
-  }
-  if (!write_file(in_path, in, in_len)) {
-    std::remove(in_path.c_str());
-    std::remove(out_bmp.c_str());
-    return IMAGE_CODEC_ERR_IO;
-  }
+  // 模块内部的后端取值与 C API 枚举并不统一（历史原因）：JPEG 用 0/1，
+  // TIFF 用 0/2。这里显式换算，别让调用方去猜。
+  const bool cpu = codec->backend == IMAGE_CODEC_BACKEND_CPU;
 
-  const int backend = codec->backend;
-  int rc = -1;
+  image_codec::ImageBuffer img;
+  std::string err;
+
   switch (format) {
-  case IMAGE_CODEC_FORMAT_JPEG:
-    // image_codec_jpeg_decode backend: 0=opencl, 1=cpu。
-    rc = image_codec_jpeg_decode(in_path.c_str(), out_bmp.c_str(),
-                                 backend == IMAGE_CODEC_BACKEND_CPU ? 1 : 0);
+  case IMAGE_CODEC_FORMAT_JPEG: {
+    // jpeg_decode_buffer 要 vector，且它是唯一一个「必须整段持有」的入口
+    // （JPEG 的熵解码需要回填 offset）。其余格式直接吃裸指针。
+    std::vector<uint8_t> file(in, in + in_len);
+    image_codec::jpeg::JpegDecodeResult res;
+    if (image_codec::jpeg::jpeg_decode_buffer(file, cpu ? 1 : 0, &res) != 0) {
+      return IMAGE_CODEC_ERR_DECODE_FAILED;
+    }
+    img.width = res.width;
+    img.height = res.height;
+    img.channels = res.channels;
+    img.data = std::move(res.rgb);
     break;
-  case IMAGE_CODEC_FORMAT_TIFF:
-    // image_codec_tiff_decode backend: 0=opencl, 2=cpu —— 与 image_codec_backend 枚举值一致。
-    rc = image_codec_tiff_decode(in_path.c_str(), out_bmp.c_str(), backend);
+  }
+  case IMAGE_CODEC_FORMAT_TIFF: {
+    int w = 0, h = 0, c = 0;
+    if (image_codec::tiff::tiffDecodeFromBuffer(in, in_len, w, h, c,
+                                                img.data) != 0) {
+      return IMAGE_CODEC_ERR_DECODE_FAILED;
+    }
+    img.width = w;
+    img.height = h;
+    img.channels = c;
     break;
-  case IMAGE_CODEC_FORMAT_PNG:
-    rc = image_codec_png_decode(in_path.c_str(), out_bmp.c_str(), backend);
+  }
+  case IMAGE_CODEC_FORMAT_PNG: {
+    if (!image_codec::ocl::png::decodePng(in, in_len, &img, &err)) {
+      return IMAGE_CODEC_ERR_DECODE_FAILED;
+    }
     break;
+  }
   default:
-    std::remove(in_path.c_str());
-    std::remove(out_bmp.c_str());
     return IMAGE_CODEC_ERR_UNSUPPORTED_FORMAT;
   }
 
-  std::remove(in_path.c_str());
-  if (rc != 0) {
-    std::remove(out_bmp.c_str());
+  if (!img.valid()) {
     return IMAGE_CODEC_ERR_DECODE_FAILED;
   }
-
-  // 读模块写出的 BMP -> image_codec_image。通道数由 BMP 位深决定：
-  // 8-bit 灰度 BMP 就是 1 通道（通道保真），不会在这里被铺成 RGB。
-  image_codec::ImageBuffer img;
-  std::string err;
-  if (image_codec::bmp_read(out_bmp, &img, &err) != 0 || !img.valid()) {
-    std::remove(out_bmp.c_str());
-    return IMAGE_CODEC_ERR_DECODE_FAILED;
-  }
-  std::remove(out_bmp.c_str());
 
   out->width = static_cast<uint32_t>(img.width);
   out->height = static_cast<uint32_t>(img.height);
   out->channels = static_cast<uint32_t>(img.channels);
   out->stride = img.stride();
-  out->data_size = img.data.size();
-  out->data = static_cast<uint8_t *>(std::malloc(img.data.size()));
+  out->data_size = img.size();
+  out->data = static_cast<uint8_t *>(std::malloc(out->data_size));
   if (out->data == nullptr) {
     std::memset(out, 0, sizeof(*out));
     return IMAGE_CODEC_ERR_OUT_OF_MEMORY;
   }
-  std::memcpy(out->data, img.data.data(), img.data.size());
+  std::memcpy(out->data, img.data.data(), out->data_size);
   return IMAGE_CODEC_OK;
 }
 
@@ -270,9 +216,16 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
       out_len == nullptr) {
     return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
   }
-  if (img->data == nullptr || img->width == 0 || img->height == 0 ||
-      (img->channels != 1 && img->channels != 3)) {
+  if (img->data == nullptr || img->width == 0 || img->height == 0) {
     return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
+  }
+  // 通道 1..4 都接受，但 JPEG 没有 Alpha 样本：2/4 通道必须明确拒绝。
+  // 悄悄丢掉 Alpha 也是一种「成功」，只是成功得很危险。
+  if (!channelsAllowed(format, static_cast<int>(img->channels))) {
+    return format == IMAGE_CODEC_FORMAT_JPEG && img->channels != 0 &&
+                   img->channels <= 4
+               ? IMAGE_CODEC_ERR_UNSUPPORTED_FORMAT
+               : IMAGE_CODEC_ERR_INVALID_ARGUMENT;
   }
 
   const int backend = codec->backend;
@@ -329,50 +282,51 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
     rgb = packed.data();
   }
 
-  std::string in_bmp, out_path;
-  if (!make_temp_path(&in_bmp) || !make_temp_path(&out_path)) {
-    return IMAGE_CODEC_ERR_IO;
-  }
-  std::string err;
-  if (image_codec::bmp_write_pixels(in_bmp, rgb, static_cast<int>(img->width),
-                                    static_cast<int>(img->height),
-                                    static_cast<int>(img->channels),
-                                    &err) != 0) {
-    std::remove(in_bmp.c_str());
-    std::remove(out_path.c_str());
-    return IMAGE_CODEC_ERR_IO;
-  }
-
-  int rc = -1;
-  switch (format) {
-  case IMAGE_CODEC_FORMAT_JPEG:
-    rc = image_codec_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
-                                 backend == IMAGE_CODEC_BACKEND_CPU ? 1 : 0,
-                                 jpeg_quality, jpeg_subsampling);
-    break;
-  case IMAGE_CODEC_FORMAT_TIFF:
-    rc = image_codec_tiff_encode(in_bmp.c_str(), out_path.c_str(), backend,
-                                 tiff_compression, tiff_rows_per_strip);
-    break;
-  case IMAGE_CODEC_FORMAT_PNG:
-    rc = image_codec_png_encode(in_bmp.c_str(), out_path.c_str(), backend,
-                                png_compression, png_filter);
-    break;
-  default:
-    break;
-  }
-  std::remove(in_bmp.c_str());
-  if (rc != 0) {
-    std::remove(out_path.c_str());
-    return IMAGE_CODEC_ERR_ENCODE_FAILED;
-  }
-
   std::vector<uint8_t> encoded;
-  if (!read_file(out_path, &encoded)) {
-    std::remove(out_path.c_str());
-    return IMAGE_CODEC_ERR_IO;
+  std::string err;
+  const bool cpu = backend == IMAGE_CODEC_BACKEND_CPU;
+
+  switch (format) {
+  case IMAGE_CODEC_FORMAT_JPEG: {
+    const std::vector<uint8_t> pixels(rgb, rgb + row_bytes * img->height);
+    if (image_codec::jpeg::jpeg_encode_buffer(
+            pixels, static_cast<int>(img->width), static_cast<int>(img->height),
+            static_cast<int>(img->channels), jpeg_quality, jpeg_subsampling,
+            cpu ? 1 : 0, &encoded, &err) != 0) {
+      return IMAGE_CODEC_ERR_ENCODE_FAILED;
+    }
+    break;
   }
-  std::remove(out_path.c_str());
+  case IMAGE_CODEC_FORMAT_TIFF: {
+    if (image_codec::tiff::tiffEncodeToBuffer(
+            static_cast<int>(img->width), static_cast<int>(img->height),
+            static_cast<int>(img->channels), rgb, tiff_compression,
+            tiff_rows_per_strip, cpu ? 2 : 0, encoded) != 0) {
+      return IMAGE_CODEC_ERR_ENCODE_FAILED;
+    }
+    break;
+  }
+  case IMAGE_CODEC_FORMAT_PNG: {
+    image_codec::ImageBuffer view;
+    view.width = static_cast<int>(img->width);
+    view.height = static_cast<int>(img->height);
+    view.channels = static_cast<int>(img->channels);
+    view.data.assign(rgb, rgb + row_bytes * img->height);
+
+    image_codec::ocl::png::PngEncodeOptions options;
+    options.use_gpu = !cpu;
+    options.filter = png_filter;
+    options.compression_level = png_compression;
+    bool gpu_used = false;
+    if (!image_codec::ocl::png::encodePng(view, options, &encoded, &gpu_used,
+                                          &err)) {
+      return IMAGE_CODEC_ERR_ENCODE_FAILED;
+    }
+    break;
+  }
+  default:
+    return IMAGE_CODEC_ERR_UNSUPPORTED_FORMAT;
+  }
 
   if (encoded.size() > out_capacity) {
     *out_len = encoded.size(); // 告知所需大小，支持先查后写。
