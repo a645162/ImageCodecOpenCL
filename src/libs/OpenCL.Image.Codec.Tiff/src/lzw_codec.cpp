@@ -71,6 +71,15 @@ int cpuLzwEncode(const uint8_t *in, size_t in_size, std::vector<uint8_t> &out) {
       }
     }
     cpuPutBits(out, bitbuf, nbits, prefix, width);
+    // 最后一个数据码之后补一次「假想建表」的宽度记账：解码器读到最后一个码
+    // 仍会建一条（下一条才用得到的）条目；若这次建表正好跨过 512/1024/2048，
+    // 它会按更宽的码读 EOI，编码器不补这一步就会位流错位（缺 EOI / 多解字节）。
+    if (next_code < 4096u) {
+      next_code++;
+      if (next_code == 512u) width = 10;
+      else if (next_code == 1024u) width = 11;
+      else if (next_code == 2048u) width = 12;
+    }
   }
   cpuPutBits(out, bitbuf, nbits, 257u, width); // EOI
   if (nbits > 0) out.push_back(static_cast<uint8_t>(bitbuf << (8 - nbits)));

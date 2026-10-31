@@ -73,6 +73,15 @@ __kernel void lzw_encode(
         }
     }
     put_bits(out, &out_len, &bitbuf, &nbits, prefix, width);
+    // 最后一个数据码之后补一次「假想建表」的宽度记账：解码器读到最后一个码
+    // 仍会建一条（下一条才用得到的）条目，若这次建表正好跨过 512/1024/2048，
+    // 它会按更宽的码读 EOI；编码器不补这一步就会位流错位。
+    if (next_code < 4096u) {
+      next_code++;
+      if (next_code == 512u) width = 10;
+      else if (next_code == 1024u) width = 11;
+      else if (next_code == 2048u) width = 12;
+    }
     put_bits(out, &out_len, &bitbuf, &nbits, 257u, width); // EOI
     if (nbits > 0) {
         out[out_len++] = (uchar)(bitbuf << (8 - nbits));
