@@ -4,11 +4,17 @@
 
 ## 特性
 
+三个格式都是「**只把最贵的一步放 GPU**」，容器与熵编码留在 CPU：
+
 - **JPEG**（baseline，SOF0，8-bit）
-  - GPU（OpenCL）：**混合策略**——Huffman 熵编解码在 CPU，DCT/IDCT、量化/反量化、YCbCr↔RGB、上下采样在 GPU。支持 4:4:4 / 4:2:0 / 4:2:2 / 灰度（解码）。
+  - GPU（OpenCL）：**混合策略**——Huffman 熵编解码在 CPU，DCT/IDCT、量化/反量化、YCbCr↔RGB、上下采样在 GPU。支持 4:4:4 / 4:2:0 / 4:2:2 / 灰度（**编解码双向**）。
 - **TIFF**（6.0，Compression=1 none / 5 LZW，strip/tile）
   - 编码：LZW 在 GPU（strip/tile 并行 kernel，block 自适应）。
   - 解码：LZW 在 CPU（对齐 libtiff 语义）。GPU 并行 LZW 解码已探索并评估为不优于 CPU（见 `src/tiff/README.md`）。
+- **PNG**（8-bit，非隔行，color type 0/2/4/6）
+  - GPU（OpenCL）：行滤波与自适应滤波器选择（两个 kernel：逐行滤波 + 每行 5 种 filter 的残差绝对值和）。
+  - CPU：chunk/CRC 与 zlib deflate/inflate；GPU 不可用时回退同一套 CPU 参考实现，并记录原因。
+- **通道保真**：1 通道（灰度）进就 1 通道出，TIFF/PNG/JPEG 与 C API 全链路不做隐式升维。
 
 ## 构建
 
@@ -25,20 +31,23 @@ cmake --build build
 ## CLI 用法（`build/cli/oic.exe`）
 
 ```
-oic list-devices
-oic info <in>
-oic decode <in> <out> [--backend opencl|onevpl|cpu]
-oic encode <in> <out> [--backend ...] [--jpeg-quality N]
-            [--tiff-compression 1|5] [--rows-per-strip N]
-oic bench <in> [--iterations N] [--backend ...]
+image_codec list-devices
+image_codec info <in>
+image_codec decode <in> <out> [--backend opencl|cpu]
+image_codec encode <in> <out> [--backend ...] [--jpeg-quality N]
+                       [--tiff-compression 1|5] [--rows-per-strip N]
+                       [--png-level 0..9] [--png-filter -1|0..4]
+image_codec bench <in> [--iterations N] [--backend ...]
 ```
 
 示例：
 ```bash
-oic encode in.bmp out.tiff --backend opencl --tiff-compression 5   # TIFF LZW GPU 编码
-oic decode out.tiff back.bmp --backend cpu                         # TIFF 解码
-oic encode in.bmp out.jpg --backend opencl --jpeg-quality 90       # JPEG OpenCL 编码
-oic decode out.jpg back.bmp --backend opencl                       # JPEG 解码
+image_codec encode in.bmp out.tiff --backend opencl --tiff-compression 5  # TIFF LZW GPU 编码
+image_codec decode out.tiff back.bmp --backend cpu                        # TIFF 解码
+image_codec encode in.bmp out.jpg --backend opencl --jpeg-quality 90      # JPEG OpenCL 编码
+image_codec decode out.jpg back.bmp --backend opencl                      # JPEG 解码
+image_codec encode in.bmp out.png --backend opencl --png-filter -1        # PNG 自适应行滤波
+image_codec decode out.png back.bmp --backend opencl                      # PNG 解码
 ```
 
 ## C API（`include/OpenCLImageCodec/oic.h`）
@@ -56,20 +65,24 @@ C++ 包装（`oic.hpp`）：`oic::Codec`（RAII，抛 `oic::Error`）、`oic::Im
 ## 目录结构
 
 ```
-include/OpenCLImageCodec/  对外 C/C++ API 头（oic.h / oic.hpp）
-src/core/                  OpenCLImageCodec.Core —— 平台抽象 + OpenCL 设备/上下文/kernel 构建
-src/tiff/                  OpenCLImageCodec.Tiff —— TIFF 容器 + LZW 编码(GPU)/解码(CPU)
-src/jpeg/                  OpenCLImageCodec.Jpeg —— baseline JPEG 混合编解码（OpenCL）
-src/api/                   OpenCLImageCodec.Api —— C API 实现（buffer ↔ 临时文件桥接）
-cli/                       oic 可执行（子命令 info/decode/encode/bench）
+include/OpenCLImageCodec/  对外 C/C++ API 头（image_codec.h / image_codec.hpp）
+src/libs/OpenCL.Image.Codec.Core    平台抽象 + OpenCL 设备/上下文/kernel 构建
+src/libs/OpenCL.Image.Codec.Common  ImageBuffer + BMP 中转（8-bit 灰度 / 24-bit RGB）
+src/libs/OpenCL.Image.Codec.Tiff    TIFF 容器 + LZW 编码(GPU)/解码(CPU)
+src/libs/OpenCL.Image.Codec.Jpeg    baseline JPEG 混合编解码（OpenCL）
+src/libs/OpenCL.Image.Codec.Png     PNG 容器(zlib) + GPU 行滤波
+src/libs/OpenCL.Image.Codec.Metrics MSE / PSNR / SSIM / MS-SSIM
+src/libs/OpenCL.Image.Codec.Api     C API 实现（buffer ↔ 临时文件桥接）
+src/cli/                   image_codec 可执行（子命令 info/decode/encode/bench）
 examples/                  纯 C / C++ 示例
 ```
 
 ## 已知限制
 
 - **JPEG 彩色解码**：与 libjpeg 最大差 ≤3 灰阶（0.5% 像素，浮点 IDCT vs libjpeg 整数 IDCT）；灰度/8×8 像素级一致。
-- **JPEG 编码**：仅 3 分量彩色（灰度编码未实现）；渐进式/非 8-bit/16-bit 量化表拒绝。
-- **TIFF 解码**：仅 8-bit RGB chunky（LZW/none）；tiled TIFF 需 libtiff 复核（本机 ffmpeg 的 tiled 解码有缺陷）。
+- **JPEG**：编码/解码支持 1 分量（灰度）与 3 分量；渐进式/非 8-bit/16-bit 量化表拒绝。
+- **TIFF 解码**：8-bit chunky（LZW/none），spp=1（BlackIsZero）与 spp=3（RGB）。
+- **PNG**：仅 8-bit 非隔行；16-bit / 隔行 / 调色板（color type 3）拒绝。
 - **Intel NEO**：单 work-item 输入 >~200KB 可能 `CL_OUT_OF_RESOURCES`（编码已按 `block_cap` 自适应）。
 
 ## 许可证

@@ -13,7 +13,7 @@ namespace tiff {
 
 namespace {
 
-inline void cpuPutBits(std::vector<uint8_t>& out, uint32_t& bitbuf, int& nbits,
+inline void cpuPutBits(std::vector<uint8_t> &out, uint32_t &bitbuf, int &nbits,
                        uint32_t value, int width) {
   bitbuf = (bitbuf << width) | value;
   nbits += width;
@@ -24,9 +24,9 @@ inline void cpuPutBits(std::vector<uint8_t>& out, uint32_t& bitbuf, int& nbits,
   bitbuf &= (1u << nbits) - 1u;
 }
 
-}  // namespace
+} // namespace
 
-int cpuLzwEncode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out) {
+int cpuLzwEncode(const uint8_t *in, size_t in_size, std::vector<uint8_t> &out) {
   out.clear();
   if (in == nullptr && in_size > 0) return -1;
   std::vector<uint32_t> dict(4096, 0);
@@ -39,7 +39,7 @@ int cpuLzwEncode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out) {
     return ((key * 2654435761u) >> 20) & 4095u;
   };
 
-  cpuPutBits(out, bitbuf, nbits, 256u, 9);  // ClearCode
+  cpuPutBits(out, bitbuf, nbits, 256u, 9); // ClearCode
   if (in_size > 0) {
     uint32_t prefix = in[0];
     for (size_t i = 1; i < in_size; ++i) {
@@ -72,14 +72,16 @@ int cpuLzwEncode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out) {
     }
     cpuPutBits(out, bitbuf, nbits, prefix, width);
   }
-  cpuPutBits(out, bitbuf, nbits, 257u, width);  // EOI
+  cpuPutBits(out, bitbuf, nbits, 257u, width); // EOI
   if (nbits > 0) out.push_back(static_cast<uint8_t>(bitbuf << (8 - nbits)));
   return 0;
 }
 
-int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb,
-                     int compression, int rows_per_strip, int backend) {
+int tiffEncodeToFile(const char *path, int width, int height, int channels,
+                     const uint8_t *rgb, int compression, int rows_per_strip,
+                     int backend) {
   if (path == nullptr || rgb == nullptr || width <= 0 || height <= 0) return -1;
+  if (channels != 1 && channels != 3) return -2;
   if (rows_per_strip <= 0) rows_per_strip = height;
   if (compression != 1 && compression != 5) return -2;
 
@@ -94,7 +96,8 @@ int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb
   }
   const size_t n_strips =
       static_cast<size_t>((height + rows_per_strip - 1) / rows_per_strip);
-  const size_t row_bytes = static_cast<size_t>(width) * 3;
+  const size_t row_bytes =
+      static_cast<size_t>(width) * static_cast<size_t>(channels);
 
   std::vector<uint32_t> sizes;
   std::vector<uint8_t> data;
@@ -103,14 +106,14 @@ int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb
     sizes.reserve(n_strips);
     for (size_t i = 0; i < n_strips; ++i) {
       const size_t y0 = static_cast<size_t>(i) * rows_per_strip;
-      const size_t rows =
-          std::min<size_t>(static_cast<size_t>(rows_per_strip),
-                           static_cast<size_t>(height) - y0);
+      const size_t rows = std::min<size_t>(static_cast<size_t>(rows_per_strip),
+                                           static_cast<size_t>(height) - y0);
       const size_t bytes = rows * row_bytes;
-      data.insert(data.end(), rgb + y0 * row_bytes, rgb + y0 * row_bytes + bytes);
+      data.insert(data.end(), rgb + y0 * row_bytes,
+                  rgb + y0 * row_bytes + bytes);
       sizes.push_back(static_cast<uint32_t>(bytes));
     }
-  } else {  // LZW
+  } else { // LZW
     int rc = -1;
     if (backend == 0) {
       LzwEncodeOcl enc(0);
@@ -137,7 +140,7 @@ int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb
   TiffWriter w;
   if (!w.openStrip(width, height, rows_per_strip,
                    compression == 5 ? kCompressionLzw : kCompressionNone,
-                   n_strips)) {
+                   n_strips, channels)) {
     return -5;
   }
   size_t off = 0;
@@ -149,9 +152,10 @@ int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb
   return 0;
 }
 
-int tiffDecodeFromFile(const char* path, int& width, int& height,
-                       std::vector<uint8_t>& rgb) {
+int tiffDecodeFromFile(const char *path, int &width, int &height, int &channels,
+                       std::vector<uint8_t> &rgb) {
   rgb.clear();
+  channels = 0;
   TiffReader r;
   if (!r.openFile(path)) return -1;
 
@@ -159,18 +163,22 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
   if (!r.imageInfo(width, height, spp, bps, photometric, compression, planar)) {
     return -2;
   }
-  if (spp != 3 || bps != 8 || photometric != 2 || planar != 1) {
-    return -3;  // 仅支持 8-bit RGB chunky
+  // 8-bit chunky，且 (spp==1 + BlackIsZero) 或 (spp==3 + RGB)。
+  if (bps != 8 || planar != 1) return -3;
+  if (!((spp == 1 && photometric == 1) || (spp == 3 && photometric == 2))) {
+    return -3;
   }
   if (compression != kCompressionNone && compression != kCompressionLzw) {
     return -4;
   }
+  channels = spp;
 
-  const size_t row_bytes = static_cast<size_t>(width) * 3;
+  const size_t row_bytes =
+      static_cast<size_t>(width) * static_cast<size_t>(channels);
   rgb.assign(row_bytes * static_cast<size_t>(height), 0);
 
-  auto decodeOne = [&](const std::vector<uint8_t>& raw,
-                       std::vector<uint8_t>& dec) -> int {
+  auto decodeOne = [&](const std::vector<uint8_t> &raw,
+                       std::vector<uint8_t> &dec) -> int {
     if (compression == kCompressionLzw) {
       return lzwDecode(raw.data(), raw.size(), dec);
     }
@@ -182,9 +190,9 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
     std::vector<uint32_t> offs, counts;
     uint32_t tw = 0, th = 0;
     if (!r.getTileInfo(offs, counts, tw, th)) return -5;
-    const size_t tiles_per_row =
-        (static_cast<size_t>(width) + tw - 1) / tw;
-    const size_t tile_bytes = static_cast<size_t>(tw) * th * 3;
+    const size_t tiles_per_row = (static_cast<size_t>(width) + tw - 1) / tw;
+    const size_t tile_bytes =
+        static_cast<size_t>(tw) * th * static_cast<size_t>(channels);
     for (size_t i = 0; i < offs.size(); ++i) {
       std::vector<uint8_t> raw;
       if (!r.loadBytes(offs[i], counts[i], raw)) return -6;
@@ -200,9 +208,11 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
       const size_t h_valid =
           std::min(static_cast<size_t>(th), static_cast<size_t>(height) - y0);
       for (size_t rr = 0; rr < h_valid; ++rr) {
-        std::memcpy(rgb.data() + (y0 + rr) * row_bytes + x0 * 3,
-                    dec.data() + rr * static_cast<size_t>(tw) * 3,
-                    w_valid * 3);
+        std::memcpy(rgb.data() + (y0 + rr) * row_bytes +
+                        x0 * static_cast<size_t>(channels),
+                    dec.data() + rr * static_cast<size_t>(tw) *
+                                     static_cast<size_t>(channels),
+                    w_valid * static_cast<size_t>(channels));
       }
     }
   } else {
@@ -226,5 +236,5 @@ int tiffDecodeFromFile(const char* path, int& width, int& height,
   return 0;
 }
 
-}  // namespace tiff
-}  // namespace image_codec
+} // namespace tiff
+} // namespace image_codec

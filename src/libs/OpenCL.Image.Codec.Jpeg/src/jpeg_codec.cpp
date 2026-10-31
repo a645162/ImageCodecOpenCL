@@ -13,7 +13,7 @@ namespace jpeg {
 
 namespace {
 
-void infer_subsampling(const JpegImage& img, int* out) {
+void infer_subsampling(const JpegImage &img, int *out) {
   int hs = 1, vs = 1;
   for (int c = 0; c < img.ncomp; c++) {
     if (c == 0) {
@@ -36,10 +36,10 @@ void infer_subsampling(const JpegImage& img, int* out) {
   }
 }
 
-}  // namespace
+} // namespace
 
-int jpeg_decode_buffer(const std::vector<uint8_t>& file, int backend,
-                       JpegDecodeResult* out) {
+int jpeg_decode_buffer(const std::vector<uint8_t> &file, int backend,
+                       JpegDecodeResult *out) {
   out->rgb.clear();
   out->error.clear();
   JpegImage img;
@@ -67,40 +67,53 @@ int jpeg_decode_buffer(const std::vector<uint8_t>& file, int backend,
   out->width = img.width;
   out->height = img.height;
   out->ncomp = img.ncomp;
+  out->channels = (img.ncomp == 1) ? 1 : 3;
   infer_subsampling(img, &out->subsampling);
   out->rgb = std::move(rgb);
   return 0;
 }
 
-int jpeg_encode_buffer(const std::vector<uint8_t>& rgb, int width, int height,
-                       int quality, int subsampling, int backend,
-                       std::vector<uint8_t>* jpeg_out, std::string* err) {
+int jpeg_encode_buffer(const std::vector<uint8_t> &rgb, int width, int height,
+                       int channels, int quality, int subsampling, int backend,
+                       std::vector<uint8_t> *jpeg_out, std::string *err) {
   if (quality < 1) quality = 1;
   if (quality > 100) quality = 100;
-  if (subsampling != 444 && subsampling != 420 && subsampling != 422) {
+  if (channels != 1 && channels != 3) {
+    if (err) *err = "channels must be 1 (gray) or 3 (RGB)";
+    return -1;
+  }
+  if (channels == 1) {
+    subsampling = 444; // 灰度没有色度，强制不采样。
+  } else if (subsampling != 444 && subsampling != 420 && subsampling != 422) {
     subsampling = (quality >= 92) ? 444 : 420;
   }
-  (void)backend;  // 当前仅 OpenCL 后端
+  (void)backend; // 当前仅 OpenCL 后端
 
   JpegImage img;
   img.width = width;
   img.height = height;
-  img.ncomp = 3;
+  img.ncomp = channels;
   img.max_h = 2;
   img.max_v = 2;
   img.comp[0].id = 1;
-  img.comp[1].id = 2;
-  img.comp[2].id = 3;
   img.comp[0].tq = 0;
-  img.comp[1].tq = 1;
-  img.comp[2].tq = 1;
   img.comp[0].td = 0;
   img.comp[0].ta = 0;
-  img.comp[1].td = 1;
-  img.comp[1].ta = 1;
-  img.comp[2].td = 1;
-  img.comp[2].ta = 1;
-  if (subsampling == 444) {
+  if (channels == 3) {
+    img.comp[1].id = 2;
+    img.comp[2].id = 3;
+    img.comp[1].tq = 1;
+    img.comp[2].tq = 1;
+    img.comp[1].td = 1;
+    img.comp[1].ta = 1;
+    img.comp[2].td = 1;
+    img.comp[2].ta = 1;
+  }
+  if (channels == 1) {
+    // 单分量：4:4:4，只有亮度表。
+    img.max_h = img.max_v = 1;
+    img.comp[0].h_samp = img.comp[0].v_samp = 1;
+  } else if (subsampling == 444) {
     img.max_h = img.max_v = 1;
     for (int c = 0; c < 3; c++) img.comp[c].h_samp = img.comp[c].v_samp = 1;
   } else if (subsampling == 420) {
@@ -108,7 +121,7 @@ int jpeg_encode_buffer(const std::vector<uint8_t>& rgb, int width, int height,
     img.comp[0].v_samp = 2;
     img.comp[1].h_samp = img.comp[1].v_samp = 1;
     img.comp[2].h_samp = img.comp[2].v_samp = 1;
-  } else {  // 422
+  } else { // 422
     img.comp[0].h_samp = 2;
     img.comp[0].v_samp = 1;
     img.comp[1].h_samp = img.comp[1].v_samp = 1;
@@ -118,8 +131,10 @@ int jpeg_encode_buffer(const std::vector<uint8_t>& rgb, int width, int height,
   jpeg_make_quant_tables(quality, img.quant);
   img.huff_dc[0] = jpeg_std_dc_lum();
   img.huff_ac[0] = jpeg_std_ac_lum();
-  img.huff_dc[1] = jpeg_std_dc_chroma();
-  img.huff_ac[1] = jpeg_std_ac_chroma();
+  if (channels == 3) {
+    img.huff_dc[1] = jpeg_std_dc_chroma();
+    img.huff_ac[1] = jpeg_std_ac_chroma();
+  }
 
   std::vector<float> coeffs;
   if (jpeg_gpu_encode(img, rgb.data(), &coeffs, err) != 0) {
@@ -135,9 +150,9 @@ int jpeg_encode_buffer(const std::vector<uint8_t>& rgb, int width, int height,
   return 0;
 }
 
-int jpeg_decode_file(const std::string& in_path, int backend,
-                     JpegDecodeResult* out) {
-  FILE* f = std::fopen(in_path.c_str(), "rb");
+int jpeg_decode_file(const std::string &in_path, int backend,
+                     JpegDecodeResult *out) {
+  FILE *f = std::fopen(in_path.c_str(), "rb");
   if (!f) {
     out->error = "cannot open file: " + in_path;
     return -1;
@@ -152,16 +167,17 @@ int jpeg_decode_file(const std::string& in_path, int backend,
   return jpeg_decode_buffer(file, backend, out);
 }
 
-int jpeg_encode_bmp_file(const std::string& in_bmp, const std::string& out_jpg,
-                         int backend, int quality, std::string* err) {
-  std::vector<uint8_t> rgb;
-  int w = 0, h = 0;
-  if (bmp_read(in_bmp, &rgb, &w, &h, err) != 0) return -1;
+int jpeg_encode_bmp_file(const std::string &in_bmp, const std::string &out_jpg,
+                         int backend, int quality, int subsampling,
+                         std::string *err) {
+  ImageBuffer img;
+  if (bmp_read(in_bmp, &img, err) != 0) return -1;
   std::vector<uint8_t> jpeg;
-  if (jpeg_encode_buffer(rgb, w, h, quality, 0, backend, &jpeg, err) != 0) {
+  if (jpeg_encode_buffer(img.data, img.width, img.height, img.channels, quality,
+                         subsampling, backend, &jpeg, err) != 0) {
     return -1;
   }
-  FILE* f = std::fopen(out_jpg.c_str(), "wb");
+  FILE *f = std::fopen(out_jpg.c_str(), "wb");
   if (!f) {
     if (err) *err = "cannot write file: " + out_jpg;
     return -1;
@@ -175,5 +191,5 @@ int jpeg_encode_bmp_file(const std::string& in_bmp, const std::string& out_jpg,
   return 0;
 }
 
-}  // namespace jpeg
-}  // namespace image_codec
+} // namespace jpeg
+} // namespace image_codec

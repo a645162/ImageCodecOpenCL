@@ -7,20 +7,23 @@
 namespace image_codec {
 namespace tiff {
 
-// 把 top-down RGB 图像（width*3 字节/行）写为 TIFF 文件。
+// 把 top-down 图像写为 TIFF 文件。
+// channels: 1 = 灰度（Photometric=BlackIsZero），3 = RGB。**通道保真**：
+// 1 通道进必须 1 通道出，绝不在这里升维成 3 通道。
 // compression: 1=none, 5=LZW。backend: 0=OpenCL(GPU), 2=CPU。
 // LZW 时 rows_per_strip 会被自动调整为 height 的最大 ≤rps 因子（保证 strip 等长）。
 // 返回 0 成功，负值失败。
-int tiffEncodeToFile(const char* path, int width, int height, const uint8_t* rgb,
-                     int compression, int rows_per_strip, int backend);
+int tiffEncodeToFile(const char *path, int width, int height, int channels,
+                     const uint8_t *pixels, int compression, int rows_per_strip,
+                     int backend);
 
-// 读 TIFF 文件并解出 top-down RGB（仅支持 8-bit RGB 非平面）。
-// 返回 0 成功，负值失败。
-int tiffDecodeFromFile(const char* path, int& width, int& height,
-                       std::vector<uint8_t>& rgb);
+// 读 TIFF 文件并解出 top-down 像素（仅支持 8-bit 非平面，spp 为 1 或 3）。
+// channels 返回实际通道数。返回 0 成功，负值失败。
+int tiffDecodeFromFile(const char *path, int &width, int &height, int &channels,
+                       std::vector<uint8_t> &pixels);
 
 // CPU LZW 编码单段（供 backend=CPU 与测试复用；与 GPU kernel 逻辑一致）。
-int cpuLzwEncode(const uint8_t* in, size_t in_size, std::vector<uint8_t>& out);
+int cpuLzwEncode(const uint8_t *in, size_t in_size, std::vector<uint8_t> &out);
 
-}  // namespace tiff
-}  // namespace image_codec
+} // namespace tiff
+} // namespace image_codec

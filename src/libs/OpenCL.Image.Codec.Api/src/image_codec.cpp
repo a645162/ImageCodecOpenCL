@@ -8,8 +8,10 @@
 #include "OpenCLImageCodec/image_codec.h"
 
 #include "../../OpenCL.Image.Codec.Core/src/ocl_device.h"
-#include "../../OpenCL.Image.Codec.Jpeg/src/bmp_io.h"
+#include "../../OpenCL.Image.Codec.Common/src/bmp_io.h"
+#include "../../OpenCL.Image.Codec.Common/src/image_buffer.h"
 #include "../../OpenCL.Image.Codec.Jpeg/src/jpeg_test.h"
+#include "../../OpenCL.Image.Codec.Png/src/png_test.h"
 #include "../../OpenCL.Image.Codec.Tiff/src/tiff_test.h"
 #include "../../OpenCL.Image.Codec.Metrics/src/metrics.h"
 
@@ -219,6 +221,9 @@ image_codec_status image_codec_codec_decode(image_codec_codec *codec,
     // image_codec_tiff_decode backend: 0=opencl, 2=cpu —— 与 image_codec_backend 枚举值一致。
     rc = image_codec_tiff_decode(in_path.c_str(), out_bmp.c_str(), backend);
     break;
+  case IMAGE_CODEC_FORMAT_PNG:
+    rc = image_codec_png_decode(in_path.c_str(), out_bmp.c_str(), backend);
+    break;
   default:
     std::remove(in_path.c_str());
     std::remove(out_bmp.c_str());
@@ -231,28 +236,27 @@ image_codec_status image_codec_codec_decode(image_codec_codec *codec,
     return IMAGE_CODEC_ERR_DECODE_FAILED;
   }
 
-  // 读模块写出的 BMP -> image_codec_image（RGB top-down）。
-  std::vector<uint8_t> rgb;
-  int w = 0, h = 0;
+  // 读模块写出的 BMP -> image_codec_image。通道数由 BMP 位深决定：
+  // 8-bit 灰度 BMP 就是 1 通道（通道保真），不会在这里被铺成 RGB。
+  image_codec::ImageBuffer img;
   std::string err;
-  if (image_codec::jpeg::bmp_read(out_bmp, &rgb, &w, &h, &err) != 0 ||
-      rgb.empty()) {
+  if (image_codec::bmp_read(out_bmp, &img, &err) != 0 || !img.valid()) {
     std::remove(out_bmp.c_str());
     return IMAGE_CODEC_ERR_DECODE_FAILED;
   }
   std::remove(out_bmp.c_str());
 
-  out->width = static_cast<uint32_t>(w);
-  out->height = static_cast<uint32_t>(h);
-  out->channels = 3;
-  out->stride = static_cast<size_t>(w) * 3;
-  out->data_size = rgb.size();
-  out->data = static_cast<uint8_t *>(std::malloc(rgb.size()));
+  out->width = static_cast<uint32_t>(img.width);
+  out->height = static_cast<uint32_t>(img.height);
+  out->channels = static_cast<uint32_t>(img.channels);
+  out->stride = img.stride();
+  out->data_size = img.data.size();
+  out->data = static_cast<uint8_t *>(std::malloc(img.data.size()));
   if (out->data == nullptr) {
     std::memset(out, 0, sizeof(*out));
     return IMAGE_CODEC_ERR_OUT_OF_MEMORY;
   }
-  std::memcpy(out->data, rgb.data(), rgb.size());
+  std::memcpy(out->data, img.data.data(), img.data.size());
   return IMAGE_CODEC_OK;
 }
 
@@ -267,20 +271,28 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
     return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
   }
   if (img->data == nullptr || img->width == 0 || img->height == 0 ||
-      img->channels != 3) {
+      (img->channels != 1 && img->channels != 3)) {
     return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
   }
 
   const int backend = codec->backend;
   const int jpeg_quality = params != nullptr ? params->jpeg_quality : 85;
+  const int jpeg_subsampling = params != nullptr ? params->jpeg_subsampling : 0;
   const int tiff_compression = params != nullptr ? params->tiff_compression : 5;
   const int tiff_rows_per_strip =
       params != nullptr ? params->tiff_rows_per_strip : 0;
+  const int png_compression = params != nullptr ? params->png_compression : 6;
+  const int png_filter = params != nullptr ? params->png_filter : -1;
 
   // 参数校验。
   switch (format) {
   case IMAGE_CODEC_FORMAT_JPEG:
     if (jpeg_quality < 1 || jpeg_quality > 100) {
+      return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
+    }
+    // 0 = 自动；其余只接受 444/422/420。
+    if (jpeg_subsampling != 0 && jpeg_subsampling != 444 &&
+        jpeg_subsampling != 422 && jpeg_subsampling != 420) {
       return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
     }
     break;
@@ -289,6 +301,14 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
       return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
     }
     if (tiff_rows_per_strip < 0) {
+      return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
+    }
+    break;
+  case IMAGE_CODEC_FORMAT_PNG:
+    if (png_compression < 0 || png_compression > 9) {
+      return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
+    }
+    if (png_filter < -1 || png_filter > 4) {
       return IMAGE_CODEC_ERR_INVALID_ARGUMENT;
     }
     break;
@@ -314,8 +334,10 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
     return IMAGE_CODEC_ERR_IO;
   }
   std::string err;
-  if (image_codec::jpeg::bmp_write(in_bmp, rgb, static_cast<int>(img->width),
-                                   static_cast<int>(img->height), &err) != 0) {
+  if (image_codec::bmp_write_pixels(in_bmp, rgb, static_cast<int>(img->width),
+                                    static_cast<int>(img->height),
+                                    static_cast<int>(img->channels),
+                                    &err) != 0) {
     std::remove(in_bmp.c_str());
     std::remove(out_path.c_str());
     return IMAGE_CODEC_ERR_IO;
@@ -326,11 +348,15 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
   case IMAGE_CODEC_FORMAT_JPEG:
     rc = image_codec_jpeg_encode(in_bmp.c_str(), out_path.c_str(),
                                  backend == IMAGE_CODEC_BACKEND_CPU ? 1 : 0,
-                                 jpeg_quality);
+                                 jpeg_quality, jpeg_subsampling);
     break;
   case IMAGE_CODEC_FORMAT_TIFF:
     rc = image_codec_tiff_encode(in_bmp.c_str(), out_path.c_str(), backend,
                                  tiff_compression, tiff_rows_per_strip);
+    break;
+  case IMAGE_CODEC_FORMAT_PNG:
+    rc = image_codec_png_encode(in_bmp.c_str(), out_path.c_str(), backend,
+                                png_compression, png_filter);
     break;
   default:
     break;

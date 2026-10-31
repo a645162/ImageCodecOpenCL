@@ -73,3 +73,17 @@ __kernel void fdct_quantize(__global const float* plane, int plane_stride,
   int qi = (int)floor(sum / qv + 0.5f);
   coeffs[coeff_off + bid * 64 + p] = (float)qi;
 }
+
+// 灰度 -> Y 平面（含块补齐区域，边缘复制）。
+// 灰度样本本身就是 Y，不需要颜色变换；单独一个 kernel，避免让 rgb_to_ycbcr
+// 去猜「输入到底几个通道」。
+__kernel void gray_to_y(__global const uchar* gray, int gray_stride,
+                        __global float* y_plane, int plane_stride, int width,
+                        int height, int plane_w, int plane_h) {
+  int x = get_global_id(0);
+  int y = get_global_id(1);
+  if (x >= plane_w || y >= plane_h) return;
+  int rx = x < width ? x : width - 1;
+  int ry = y < height ? y : height - 1;
+  y_plane[y * plane_stride + x] = (float)gray[ry * gray_stride + rx];
+}

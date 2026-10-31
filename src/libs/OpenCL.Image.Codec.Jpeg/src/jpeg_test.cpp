@@ -11,8 +11,8 @@
 
 namespace {
 
-int read_file(const char* path, std::vector<uint8_t>* out) {
-  FILE* f = std::fopen(path, "rb");
+int read_file(const char *path, std::vector<uint8_t> *out) {
+  FILE *f = std::fopen(path, "rb");
   if (!f) return -1;
   uint8_t buf[65536];
   size_t n;
@@ -23,11 +23,11 @@ int read_file(const char* path, std::vector<uint8_t>* out) {
   return 0;
 }
 
-}  // namespace
+} // namespace
 
 extern "C" {
 
-int image_codec_jpeg_info(const char* path) {
+int image_codec_jpeg_info(const char *path) {
   if (!path) return -1;
   std::vector<uint8_t> file;
   if (read_file(path, &file) != 0) {
@@ -43,13 +43,15 @@ int image_codec_jpeg_info(const char* path) {
   std::printf("JPEG: %dx%d, %d component(s), progressive=%d\n", img.width,
               img.height, img.ncomp, img.progressive ? 1 : 0);
   for (int c = 0; c < img.ncomp; c++) {
-    const auto& ci = img.comp[c];
-    std::printf("  comp[%d] id=%u sampling=%ux%u tq=%u td=%u ta=%u plane=%dx%d blocks=%dx%d\n",
-                c, ci.id, ci.h_samp, ci.v_samp, ci.tq, ci.td, ci.ta,
-                ci.plane_w, ci.plane_h, ci.blocks_x, ci.blocks_y);
+    const auto &ci = img.comp[c];
+    std::printf("  comp[%d] id=%u sampling=%ux%u tq=%u td=%u ta=%u plane=%dx%d "
+                "blocks=%dx%d\n",
+                c, ci.id, ci.h_samp, ci.v_samp, ci.tq, ci.td, ci.ta, ci.plane_w,
+                ci.plane_h, ci.blocks_x, ci.blocks_y);
   }
   std::printf("  MCU grid: %dx%d, max_samp=%ux%u, restart_interval=%d\n",
-              img.mcus_x, img.mcus_y, img.max_h, img.max_v, img.restart_interval);
+              img.mcus_x, img.mcus_y, img.max_h, img.max_v,
+              img.restart_interval);
   for (int t = 0; t < 4; t++) {
     if (img.quant[t].present) {
       std::printf("  quant[%d]: DC=%u, AC[1]=%u\n", t, img.quant[t].q[0],
@@ -65,7 +67,7 @@ int image_codec_jpeg_info(const char* path) {
   return 0;
 }
 
-int image_codec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
+int image_codec_jpeg_decode(const char *in, const char *out_bmp, int backend) {
   if (!in || !out_bmp) return -1;
   image_codec::jpeg::JpegDecodeResult res;
   if (image_codec::jpeg::jpeg_decode_file(in, backend, &res) != 0) {
@@ -73,7 +75,8 @@ int image_codec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
     return -1;
   }
   std::string err;
-  if (image_codec::jpeg::bmp_write(out_bmp, res.rgb.data(), res.width, res.height, &err) != 0) {
+  if (image_codec::bmp_write_pixels(out_bmp, res.rgb.data(), res.width,
+                                    res.height, res.channels, &err) != 0) {
     std::fprintf(stderr, "image_codec_jpeg_decode: %s\n", err.c_str());
     return -1;
   }
@@ -82,16 +85,18 @@ int image_codec_jpeg_decode(const char* in, const char* out_bmp, int backend) {
   return 0;
 }
 
-int image_codec_jpeg_encode(const char* in_bmp, const char* out, int backend, int quality) {
+int image_codec_jpeg_encode(const char *in_bmp, const char *out, int backend,
+                            int quality, int subsampling) {
   if (!in_bmp || !out) return -1;
   std::string err;
-  if (image_codec::jpeg::jpeg_encode_bmp_file(in_bmp, out, backend, quality, &err) != 0) {
+  if (image_codec::jpeg::jpeg_encode_bmp_file(in_bmp, out, backend, quality,
+                                              subsampling, &err) != 0) {
     std::fprintf(stderr, "image_codec_jpeg_encode: %s\n", err.c_str());
     return -1;
   }
-  std::printf("encoded %s -> %s (quality=%d, backend=%d)\n", in_bmp, out, quality,
-              backend);
+  std::printf("encoded %s -> %s (quality=%d, subsampling=%d, backend=%d)\n",
+              in_bmp, out, quality, subsampling, backend);
   return 0;
 }
 
-}  // extern "C"
+} // extern "C"

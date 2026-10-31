@@ -27,8 +27,7 @@ void build_dct_matrix(float m[64][64]) {
     for (int j = 0; j < 64; j++) {
       const int x = j & 7;
       const int y = j >> 3;
-      m[p][j] = 0.25f * cu * cv *
-                std::cos(kPi * (2 * x + 1) * u / 16.0f) *
+      m[p][j] = 0.25f * cu * cv * std::cos(kPi * (2 * x + 1) * u / 16.0f) *
                 std::cos(kPi * (2 * y + 1) * v / 16.0f);
     }
   }
@@ -43,17 +42,19 @@ struct GpuState {
   cl_kernel k_idct = nullptr;
   cl_kernel k_ycbcr = nullptr;
   cl_kernel k_rgb2y = nullptr;
+  cl_kernel k_gray2y = nullptr;
   cl_kernel k_ds = nullptr;
   cl_kernel k_fdct = nullptr;
-  cl_mem dct_mat = nullptr;  // 解码/编码共用基矩阵
+  cl_mem dct_mat = nullptr; // 解码/编码共用基矩阵
   bool ok = false;
   std::string err;
 };
 
-bool init_gpu(GpuState& g) {
+bool init_gpu(GpuState &g) {
   cl_int err = g.dev.init(0);
   if (err != CL_SUCCESS) {
-    g.err = std::string("OpenCL device init failed: ") + OclProgram::errorName(err);
+    g.err =
+        std::string("OpenCL device init failed: ") + OclProgram::errorName(err);
     return false;
   }
   std::string log;
@@ -84,6 +85,11 @@ bool init_gpu(GpuState& g) {
     g.err = "createKernel(rgb_to_ycbcr) failed";
     return false;
   }
+  err = OclProgram::createKernel(g.enc_prog, "gray_to_y", &g.k_gray2y);
+  if (err != CL_SUCCESS) {
+    g.err = "createKernel(gray_to_y) failed";
+    return false;
+  }
   err = OclProgram::createKernel(g.enc_prog, "downsample_chroma", &g.k_ds);
   if (err != CL_SUCCESS) {
     g.err = "createKernel(downsample_chroma) failed";
@@ -96,8 +102,9 @@ bool init_gpu(GpuState& g) {
   }
   float m[64][64];
   build_dct_matrix(m);
-  g.dct_mat = clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                             sizeof(m), m, &err);
+  g.dct_mat =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     sizeof(m), m, &err);
   if (err != CL_SUCCESS || g.dct_mat == nullptr) {
     g.err = "clCreateBuffer(dct_mat) failed";
     return false;
@@ -106,7 +113,7 @@ bool init_gpu(GpuState& g) {
   return true;
 }
 
-GpuState& gpu() {
+GpuState &gpu() {
   static GpuState g;
   static bool tried = false;
   if (!tried) {
@@ -116,19 +123,19 @@ GpuState& gpu() {
   return g;
 }
 
-void check_cl(cl_int err, const char* what, std::string* err_out) {
+void check_cl(cl_int err, const char *what, std::string *err_out) {
   if (err != CL_SUCCESS && err_out) {
     *err_out = std::string(what) + ": " + OclProgram::errorName(err);
   }
 }
 
-}  // namespace
+} // namespace
 
 // ---- GPU 解码 ----
 
-int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
-                    std::vector<uint8_t>* rgb, std::string* err) {
-  GpuState& g = gpu();
+int jpeg_gpu_decode(const JpegImage &img, const std::vector<float> &coeffs,
+                    std::vector<uint8_t> *rgb, std::string *err) {
+  GpuState &g = gpu();
   if (!g.ok) {
     if (err) *err = g.err;
     return -1;
@@ -147,27 +154,27 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
 
   int plane_floats = 0;
   for (int c = 0; c < img.ncomp; c++) {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     plane_floats += (ci.blocks_x * 8) * (ci.blocks_y * 8);
   }
 
-  cl_mem coeff_buf = clCreateBuffer(
-      g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-      static_cast<size_t>(coeffs.size()) * sizeof(float),
-      const_cast<float*>(coeffs.data()), &e);
+  cl_mem coeff_buf =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     static_cast<size_t>(coeffs.size()) * sizeof(float),
+                     const_cast<float *>(coeffs.data()), &e);
   check_cl(e, "clCreateBuffer(coeffs)", err);
   if (e != CL_SUCCESS) return -1;
-  cl_mem qbuf = clCreateBuffer(g.dev.context(),
-                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                               sizeof(qtable), qtable, &e);
+  cl_mem qbuf =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     sizeof(qtable), qtable, &e);
   check_cl(e, "clCreateBuffer(qtable)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(coeff_buf);
     return -1;
   }
-  cl_mem plane_buf = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                                    static_cast<size_t>(plane_floats) * sizeof(float),
-                                    nullptr, &e);
+  cl_mem plane_buf = clCreateBuffer(
+      g.dev.context(), CL_MEM_READ_WRITE,
+      static_cast<size_t>(plane_floats) * sizeof(float), nullptr, &e);
   check_cl(e, "clCreateBuffer(planes)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(coeff_buf);
@@ -177,7 +184,7 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
 
   // 反量化 + IDCT：每分量一次。
   for (int c = 0; c < img.ncomp; c++) {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     const int blocks = ci.blocks_x * ci.blocks_y;
     const int argi = 0;
     clSetKernelArg(g.k_idct, argi, sizeof(cl_mem), &coeff_buf);
@@ -196,7 +203,9 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
     e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_idct, 1, nullptr, &gsize,
                                nullptr, 0, nullptr, nullptr);
     if (e != CL_SUCCESS) {
-      if (err) *err = std::string("dequant_idct enqueue failed: ") + OclProgram::errorName(e);
+      if (err)
+        *err = std::string("dequant_idct enqueue failed: ") +
+               OclProgram::errorName(e);
       clReleaseMemObject(coeff_buf);
       clReleaseMemObject(qbuf);
       clReleaseMemObject(plane_buf);
@@ -209,7 +218,7 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
   int desc[3 * 6] = {0};
   for (int c = 0; c < 3; c++) {
     if (c < img.ncomp) {
-      const JpegComponentInfo& ci = img.comp[c];
+      const JpegComponentInfo &ci = img.comp[c];
       desc[c * 6 + 0] = ci.plane_off;
       desc[c * 6 + 1] = ci.blocks_x * 8;
       desc[c * 6 + 2] = ci.plane_w;
@@ -225,9 +234,9 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
       desc[c * 6 + 5] = img.max_v;
     }
   }
-  cl_mem desc_buf = clCreateBuffer(g.dev.context(),
-                                   CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   sizeof(desc), desc, &e);
+  cl_mem desc_buf =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     sizeof(desc), desc, &e);
   check_cl(e, "clCreateBuffer(desc)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(coeff_buf);
@@ -236,7 +245,10 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
     return -1;
   }
 
-  const size_t out_bytes = static_cast<size_t>(img.width) * img.height * 3;
+  // 通道保真：单分量（灰度）JPEG 输出 1 字节/像素。
+  const int out_channels = (img.ncomp == 1) ? 1 : 3;
+  const size_t out_bytes = static_cast<size_t>(img.width) * img.height *
+                           static_cast<size_t>(out_channels);
   rgb->assign(out_bytes, 0);
   cl_mem out_buf = clCreateBuffer(g.dev.context(), CL_MEM_WRITE_ONLY, out_bytes,
                                   nullptr, &e);
@@ -256,15 +268,19 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
   clSetKernelArg(g.k_ycbcr, 3, sizeof(int), &mv);
   clSetKernelArg(g.k_ycbcr, 4, sizeof(int), &nc);
   clSetKernelArg(g.k_ycbcr, 5, sizeof(cl_mem), &out_buf);
-  int ostride = img.width * 3;
+  int ostride = img.width * out_channels;
   clSetKernelArg(g.k_ycbcr, 6, sizeof(int), &ostride);
   clSetKernelArg(g.k_ycbcr, 7, sizeof(int), &img.width);
   clSetKernelArg(g.k_ycbcr, 8, sizeof(int), &img.height);
-  size_t gdim[2] = {static_cast<size_t>(img.width), static_cast<size_t>(img.height)};
-  e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_ycbcr, 2, nullptr, gdim, nullptr,
-                             0, nullptr, nullptr);
+  clSetKernelArg(g.k_ycbcr, 9, sizeof(int), &out_channels);
+  size_t gdim[2] = {static_cast<size_t>(img.width),
+                    static_cast<size_t>(img.height)};
+  e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_ycbcr, 2, nullptr, gdim,
+                             nullptr, 0, nullptr, nullptr);
   if (e != CL_SUCCESS) {
-    if (err) *err = std::string("ycbcr_to_rgb enqueue failed: ") + OclProgram::errorName(e);
+    if (err)
+      *err = std::string("ycbcr_to_rgb enqueue failed: ") +
+             OclProgram::errorName(e);
     clReleaseMemObject(coeff_buf);
     clReleaseMemObject(qbuf);
     clReleaseMemObject(plane_buf);
@@ -294,9 +310,9 @@ int jpeg_gpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
 
 // ---- GPU 编码 ----
 
-int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
-                    std::vector<float>* coeffs, std::string* err) {
-  GpuState& g = gpu();
+int jpeg_gpu_encode(const JpegImage &img, const uint8_t *rgb,
+                    std::vector<float> *coeffs, std::string *err) {
+  GpuState &g = gpu();
   if (!g.ok) {
     if (err) *err = g.err;
     return -1;
@@ -317,27 +333,29 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
   const int full_h = img.mcus_y * img.max_v * 8;
   const int full_floats = full_w * full_h;
 
-  const size_t rgb_bytes = static_cast<size_t>(img.width) * img.height * 3;
-  cl_mem rgb_buf = clCreateBuffer(g.dev.context(),
-                                  CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                  rgb_bytes, const_cast<uint8_t*>(rgb), &e);
+  const int in_channels = (img.ncomp == 1) ? 1 : 3;
+  const size_t rgb_bytes = static_cast<size_t>(img.width) * img.height *
+                           static_cast<size_t>(in_channels);
+  cl_mem rgb_buf =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     rgb_bytes, const_cast<uint8_t *>(rgb), &e);
   check_cl(e, "clCreateBuffer(rgb)", err);
   if (e != CL_SUCCESS) return -1;
 
-  cl_mem y_buf = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                                static_cast<size_t>(full_floats) * sizeof(float),
-                                nullptr, &e);
+  cl_mem y_buf = clCreateBuffer(
+      g.dev.context(), CL_MEM_READ_WRITE,
+      static_cast<size_t>(full_floats) * sizeof(float), nullptr, &e);
   check_cl(e, "clCreateBuffer(y)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(rgb_buf);
     return -1;
   }
-  cl_mem cb_buf = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                                 static_cast<size_t>(full_floats) * sizeof(float),
-                                 nullptr, &e);
-  cl_mem cr_buf = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                                 static_cast<size_t>(full_floats) * sizeof(float),
-                                 nullptr, &e);
+  cl_mem cb_buf = clCreateBuffer(
+      g.dev.context(), CL_MEM_READ_WRITE,
+      static_cast<size_t>(full_floats) * sizeof(float), nullptr, &e);
+  cl_mem cr_buf = clCreateBuffer(
+      g.dev.context(), CL_MEM_READ_WRITE,
+      static_cast<size_t>(full_floats) * sizeof(float), nullptr, &e);
   check_cl(e, "clCreateBuffer(cb/cr)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(rgb_buf);
@@ -347,28 +365,55 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
     return -1;
   }
 
-  // RGB -> YCbCr（全分辨率，边缘复制补齐）。
-  clSetKernelArg(g.k_rgb2y, 0, sizeof(cl_mem), &rgb_buf);
-  int rgb_stride = img.width * 3;
-  clSetKernelArg(g.k_rgb2y, 1, sizeof(int), &rgb_stride);
-  clSetKernelArg(g.k_rgb2y, 2, sizeof(cl_mem), &y_buf);
-  clSetKernelArg(g.k_rgb2y, 3, sizeof(cl_mem), &cb_buf);
-  clSetKernelArg(g.k_rgb2y, 4, sizeof(cl_mem), &cr_buf);
-  clSetKernelArg(g.k_rgb2y, 5, sizeof(int), &full_w);
-  clSetKernelArg(g.k_rgb2y, 6, sizeof(int), &img.width);
-  clSetKernelArg(g.k_rgb2y, 7, sizeof(int), &img.height);
-  clSetKernelArg(g.k_rgb2y, 8, sizeof(int), &full_w);
-  clSetKernelArg(g.k_rgb2y, 9, sizeof(int), &full_h);
   size_t gdim2[2] = {static_cast<size_t>(full_w), static_cast<size_t>(full_h)};
-  e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_rgb2y, 2, nullptr, gdim2, nullptr,
-                             0, nullptr, nullptr);
-  if (e != CL_SUCCESS) {
-    if (err) *err = std::string("rgb_to_ycbcr enqueue failed: ") + OclProgram::errorName(e);
-    clReleaseMemObject(rgb_buf);
-    clReleaseMemObject(y_buf);
-    clReleaseMemObject(cb_buf);
-    clReleaseMemObject(cr_buf);
-    return -1;
+  if (img.ncomp == 1) {
+    // 灰度：样本直接就是 Y，不需要颜色变换与色度平面。
+    clSetKernelArg(g.k_gray2y, 0, sizeof(cl_mem), &rgb_buf);
+    int gray_stride = img.width;
+    clSetKernelArg(g.k_gray2y, 1, sizeof(int), &gray_stride);
+    clSetKernelArg(g.k_gray2y, 2, sizeof(cl_mem), &y_buf);
+    clSetKernelArg(g.k_gray2y, 3, sizeof(int), &full_w);
+    clSetKernelArg(g.k_gray2y, 4, sizeof(int), &img.width);
+    clSetKernelArg(g.k_gray2y, 5, sizeof(int), &img.height);
+    clSetKernelArg(g.k_gray2y, 6, sizeof(int), &full_w);
+    clSetKernelArg(g.k_gray2y, 7, sizeof(int), &full_h);
+    e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_gray2y, 2, nullptr, gdim2,
+                               nullptr, 0, nullptr, nullptr);
+    if (e != CL_SUCCESS) {
+      if (err)
+        *err = std::string("gray_to_y enqueue failed: ") +
+               OclProgram::errorName(e);
+      clReleaseMemObject(rgb_buf);
+      clReleaseMemObject(y_buf);
+      clReleaseMemObject(cb_buf);
+      clReleaseMemObject(cr_buf);
+      return -1;
+    }
+  } else {
+    // RGB -> YCbCr（全分辨率，边缘复制补齐）。
+    clSetKernelArg(g.k_rgb2y, 0, sizeof(cl_mem), &rgb_buf);
+    int rgb_stride = img.width * 3;
+    clSetKernelArg(g.k_rgb2y, 1, sizeof(int), &rgb_stride);
+    clSetKernelArg(g.k_rgb2y, 2, sizeof(cl_mem), &y_buf);
+    clSetKernelArg(g.k_rgb2y, 3, sizeof(cl_mem), &cb_buf);
+    clSetKernelArg(g.k_rgb2y, 4, sizeof(cl_mem), &cr_buf);
+    clSetKernelArg(g.k_rgb2y, 5, sizeof(int), &full_w);
+    clSetKernelArg(g.k_rgb2y, 6, sizeof(int), &img.width);
+    clSetKernelArg(g.k_rgb2y, 7, sizeof(int), &img.height);
+    clSetKernelArg(g.k_rgb2y, 8, sizeof(int), &full_w);
+    clSetKernelArg(g.k_rgb2y, 9, sizeof(int), &full_h);
+    e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_rgb2y, 2, nullptr, gdim2,
+                               nullptr, 0, nullptr, nullptr);
+    if (e != CL_SUCCESS) {
+      if (err)
+        *err = std::string("rgb_to_ycbcr enqueue failed: ") +
+               OclProgram::errorName(e);
+      clReleaseMemObject(rgb_buf);
+      clReleaseMemObject(y_buf);
+      clReleaseMemObject(cb_buf);
+      clReleaseMemObject(cr_buf);
+      return -1;
+    }
   }
 
   // 色度下采样（非 4:4:4 时）。
@@ -382,12 +427,14 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
   cl_mem ds_cb = nullptr;
   cl_mem ds_cr = nullptr;
   if (need_ds) {
-    const JpegComponentInfo& c1 = img.comp[1];
+    const JpegComponentInfo &c1 = img.comp[1];
     const int ds_floats = (c1.blocks_x * 8) * (c1.blocks_y * 8);
     ds_cb = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                           static_cast<size_t>(ds_floats) * sizeof(float), nullptr, &e);
+                           static_cast<size_t>(ds_floats) * sizeof(float),
+                           nullptr, &e);
     ds_cr = clCreateBuffer(g.dev.context(), CL_MEM_READ_WRITE,
-                           static_cast<size_t>(ds_floats) * sizeof(float), nullptr, &e);
+                           static_cast<size_t>(ds_floats) * sizeof(float),
+                           nullptr, &e);
     check_cl(e, "clCreateBuffer(ds)", err);
     if (e != CL_SUCCESS) {
       clReleaseMemObject(rgb_buf);
@@ -411,10 +458,12 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
       clSetKernelArg(g.k_ds, 6, sizeof(int), &ds_w);
       clSetKernelArg(g.k_ds, 7, sizeof(int), &ds_h);
       size_t dg[2] = {static_cast<size_t>(ds_w), static_cast<size_t>(ds_h)};
-      e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_ds, 2, nullptr, dg, nullptr, 0,
-                                 nullptr, nullptr);
+      e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_ds, 2, nullptr, dg, nullptr,
+                                 0, nullptr, nullptr);
       if (e != CL_SUCCESS) {
-        if (err) *err = std::string("downsample enqueue failed: ") + OclProgram::errorName(e);
+        if (err)
+          *err = std::string("downsample enqueue failed: ") +
+                 OclProgram::errorName(e);
         clReleaseMemObject(rgb_buf);
         clReleaseMemObject(y_buf);
         clReleaseMemObject(cb_buf);
@@ -426,9 +475,9 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
     }
   }
 
-  cl_mem qbuf = clCreateBuffer(g.dev.context(),
-                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                               sizeof(qtable), qtable, &e);
+  cl_mem qbuf =
+      clCreateBuffer(g.dev.context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                     sizeof(qtable), qtable, &e);
   check_cl(e, "clCreateBuffer(qtable)", err);
   if (e != CL_SUCCESS) {
     clReleaseMemObject(rgb_buf);
@@ -456,7 +505,7 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
 
   // FDCT + 量化：每分量一次。
   for (int c = 0; c < ncomp; c++) {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     cl_mem plane;
     if (c == 0) {
       plane = y_buf;
@@ -478,10 +527,11 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
     clSetKernelArg(g.k_fdct, 7, sizeof(int), &ci.blocks_x);
     clSetKernelArg(g.k_fdct, 8, sizeof(int), &blocks);
     size_t gsz = static_cast<size_t>(blocks) * 64;
-    e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_fdct, 1, nullptr, &gsz, nullptr,
-                               0, nullptr, nullptr);
+    e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_fdct, 1, nullptr, &gsz,
+                               nullptr, 0, nullptr, nullptr);
     if (e != CL_SUCCESS) {
-      if (err) *err = std::string("fdct enqueue failed: ") + OclProgram::errorName(e);
+      if (err)
+        *err = std::string("fdct enqueue failed: ") + OclProgram::errorName(e);
       clReleaseMemObject(rgb_buf);
       clReleaseMemObject(y_buf);
       clReleaseMemObject(cb_buf);
@@ -496,10 +546,12 @@ int jpeg_gpu_encode(const JpegImage& img, const uint8_t* rgb,
 
   coeffs->assign(static_cast<size_t>(img.total_blocks) * 64, 0.f);
   e = clEnqueueReadBuffer(g.dev.queue(), coeff_buf, CL_TRUE, 0,
-                          static_cast<size_t>(img.total_blocks) * 64 * sizeof(float),
+                          static_cast<size_t>(img.total_blocks) * 64 *
+                              sizeof(float),
                           coeffs->data(), 0, nullptr, nullptr);
   if (e != CL_SUCCESS) {
-    if (err) *err = std::string("read coeffs failed: ") + OclProgram::errorName(e);
+    if (err)
+      *err = std::string("read coeffs failed: ") + OclProgram::errorName(e);
   }
 
   clReleaseMemObject(rgb_buf);
@@ -524,28 +576,28 @@ int clampi(int v) {
 }
 
 // 与 GPU kernel 相同的逐像素上采样/颜色变换逻辑（CPU 参考）。
-void cpu_ycbcr_to_rgb(const JpegImage& img, const float* planes,
-                      std::vector<uint8_t>* rgb) {
+void cpu_ycbcr_to_rgb(const JpegImage &img, const float *planes,
+                      std::vector<uint8_t> *rgb) {
   auto rd = [&](int c, int cx, int cy) -> int {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     const int stride = ci.blocks_x * 8;
     if (cx < 0) cx = 0;
     if (cx >= ci.plane_w) cx = ci.plane_w - 1;
     if (cy < 0) cy = 0;
     if (cy >= ci.plane_h) cy = ci.plane_h - 1;
     const float v = planes[ci.plane_off + cy * stride + cx];
-    return static_cast<int>(v);  // 已为整数样本
+    return static_cast<int>(v); // 已为整数样本
   };
 
   auto sample = [&](int c, int x, int y) -> int {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     const int stride = ci.blocks_x * 8;
     if (ci.h_samp == img.max_h && ci.v_samp == img.max_v) {
       return rd(c, x, y);
     }
     const int hratio = img.max_h / ci.h_samp;
     const int vratio = img.max_v / ci.v_samp;
-    const auto* p = planes + ci.plane_off;
+    const auto *p = planes + ci.plane_off;
     if (hratio == 2 && vratio == 2) {
       int cx = x >> 1, cy = y >> 1, h = x & 1, v = y & 1;
       if (cx > ci.plane_w - 1) cx = ci.plane_w - 1;
@@ -576,6 +628,17 @@ void cpu_ycbcr_to_rgb(const JpegImage& img, const float* planes,
     return rd(c, x * ci.h_samp / img.max_h, y * ci.v_samp / img.max_v);
   };
 
+  if (img.ncomp < 3) {
+    // 单分量：样本就是灰度值，直接输出 1 通道（与 GPU kernel 的 out_channels==1 一致）。
+    rgb->assign(static_cast<size_t>(img.width) * img.height, 0);
+    for (int y = 0; y < img.height; y++) {
+      for (int x = 0; x < img.width; x++) {
+        (*rgb)[static_cast<size_t>(y) * img.width + x] =
+            static_cast<uint8_t>(clampi(sample(0, x, y)));
+      }
+    }
+    return;
+  }
   rgb->assign(static_cast<size_t>(img.width) * img.height * 3, 0);
   for (int y = 0; y < img.height; y++) {
     for (int x = 0; x < img.width; x++) {
@@ -585,12 +648,13 @@ void cpu_ycbcr_to_rgb(const JpegImage& img, const float* planes,
         const int cb = sample(1, x, y) - 128;
         const int cr = sample(2, x, y) - 128;
         r = clampi(yv + ((91881 * cr + 32768) >> 16));
-        g = clampi(yv - ((46802 * cr + 32768) >> 16) - ((22554 * cb + 32768) >> 16));
+        g = clampi(yv - ((46802 * cr + 32768) >> 16) -
+                   ((22554 * cb + 32768) >> 16));
         b = clampi(yv + ((116130 * cb + 32768) >> 16));
       } else {
         r = g = b = clampi(yv);
       }
-      uint8_t* o = &(*rgb)[(y * img.width + x) * 3];
+      uint8_t *o = &(*rgb)[(y * img.width + x) * 3];
       o[0] = static_cast<uint8_t>(r);
       o[1] = static_cast<uint8_t>(g);
       o[2] = static_cast<uint8_t>(b);
@@ -598,28 +662,28 @@ void cpu_ycbcr_to_rgb(const JpegImage& img, const float* planes,
   }
 }
 
-}  // namespace
+} // namespace
 
-int jpeg_cpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
-                    std::vector<uint8_t>* rgb, std::string* err) {
+int jpeg_cpu_decode(const JpegImage &img, const std::vector<float> &coeffs,
+                    std::vector<uint8_t> *rgb, std::string *err) {
   float m[64][64];
   build_dct_matrix(m);
-  std::vector<float> planes(static_cast<size_t>(img.total_blocks) * 64 * 4 + 1024, 0.f);
+  std::vector<float> planes(
+      static_cast<size_t>(img.total_blocks) * 64 * 4 + 1024, 0.f);
   // 每分量 IDCT。
   for (int c = 0; c < img.ncomp; c++) {
-    const JpegComponentInfo& ci = img.comp[c];
+    const JpegComponentInfo &ci = img.comp[c];
     const int stride = ci.blocks_x * 8;
     const int blocks = ci.blocks_x * ci.blocks_y;
     for (int bid = 0; bid < blocks; bid++) {
-      const float* blk = &coeffs[ci.coeff_off + bid * 64];
+      const float *blk = &coeffs[ci.coeff_off + bid * 64];
       const int bx = bid % ci.blocks_x;
       const int by = bid / ci.blocks_x;
       for (int p = 0; p < 64; p++) {
         float sum = 0.f;
         for (int k = 0; k < 64; k++) {
           // IDCT 基矩阵按 [系数][像素] 存放，此处沿列求和（m[k][p]）。
-          sum += m[k][p] * blk[k] *
-                 static_cast<float>(img.quant[ci.tq].q[k]);
+          sum += m[k][p] * blk[k] * static_cast<float>(img.quant[ci.tq].q[k]);
         }
         // 解码端 IDCT 输出为 [-128,127] 电平，加 128 还原样本值。
         int iv = static_cast<int>(std::floor(sum + 128.0f + 0.5f));
@@ -635,5 +699,5 @@ int jpeg_cpu_decode(const JpegImage& img, const std::vector<float>& coeffs,
   return 0;
 }
 
-}  // namespace jpeg
-}  // namespace image_codec
+} // namespace jpeg
+} // namespace image_codec

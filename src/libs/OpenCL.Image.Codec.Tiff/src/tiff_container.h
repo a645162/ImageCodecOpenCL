@@ -12,7 +12,7 @@ namespace tiff {
 // ---- TIFF 6.0 常用 Tag/Type/值常量 ----
 enum TiffTag : uint16_t {
   kTagImageWidth = 256,
-  kTagImageLength = 257,       // ImageHeight
+  kTagImageLength = 257, // ImageHeight
   kTagBitsPerSample = 258,
   kTagCompression = 259,
   kTagPhotometric = 262,
@@ -43,12 +43,18 @@ enum TiffCompressionValue : uint16_t {
 // TIFF 字段类型字节数；未知类型返回 0。
 inline size_t tiffTypeSize(uint16_t type) {
   switch (type) {
-    case kTypeByte: return 1;
-    case kTypeAscii: return 1;
-    case kTypeShort: return 2;
-    case kTypeLong: return 4;
-    case kTypeRational: return 8;
-    default: return 0;
+  case kTypeByte:
+    return 1;
+  case kTypeAscii:
+    return 1;
+  case kTypeShort:
+    return 2;
+  case kTypeLong:
+    return 4;
+  case kTypeRational:
+    return 8;
+  default:
+    return 0;
   }
 }
 
@@ -57,8 +63,8 @@ inline size_t tiffTypeSize(uint16_t type) {
 // ---------------------------------------------------------------------------
 class TiffReader {
 public:
-  bool openFile(const char* path);
-  bool openMemory(const void* data, size_t size);
+  bool openFile(const char *path);
+  bool openMemory(const void *data, size_t size);
   void close();
 
   bool valid() const { return valid_; }
@@ -66,33 +72,39 @@ public:
   uint16_t magic() const { return magic_; }
   uint32_t ifdOffset() const { return ifd_offset_; }
   int entryCount() const { return static_cast<int>(ifd_count_); }
-  const char* byteOrderName() const {
-    return order_ == ByteOrder::Little ? "little-endian (II)" : "big-endian (MM)";
+  const char *byteOrderName() const {
+    return order_ == ByteOrder::Little ? "little-endian (II)"
+                                       : "big-endian (MM)";
   }
 
   bool hasTag(uint16_t tag) const { return tag_index_.count(tag) != 0; }
-  bool getU16(uint16_t tag, uint16_t& v) const;
-  bool getU32(uint16_t tag, uint32_t& v) const;
-  bool getU32Array(uint16_t tag, std::vector<uint32_t>& v) const;
+  bool getU16(uint16_t tag, uint16_t &v) const;
+  bool getU32(uint16_t tag, uint32_t &v) const;
+  bool getU32Array(uint16_t tag, std::vector<uint32_t> &v) const;
 
   // 图像元数据（bps=每样本位数；spp=样本/像素；photometric/compression/planar）。
-  bool imageInfo(int& w, int& h, int& spp, int& bps, int& photometric,
-                 int& compression, int& planar) const;
+  bool imageInfo(int &w, int &h, int &spp, int &bps, int &photometric,
+                 int &compression, int &planar) const;
 
   // 布局信息：是 tile 布局还是 strip 布局。
-  bool isTiled() const { return hasTag(kTagTileWidth) && hasTag(kTagTileOffsets); }
-  bool getStripInfo(std::vector<uint32_t>& offsets, std::vector<uint32_t>& counts,
-                    uint32_t& rows_per_strip) const;
-  bool getTileInfo(std::vector<uint32_t>& offsets, std::vector<uint32_t>& counts,
-                   uint32_t& tile_w, uint32_t& tile_h) const;
+  bool isTiled() const {
+    return hasTag(kTagTileWidth) && hasTag(kTagTileOffsets);
+  }
+  bool getStripInfo(std::vector<uint32_t> &offsets,
+                    std::vector<uint32_t> &counts,
+                    uint32_t &rows_per_strip) const;
+  bool getTileInfo(std::vector<uint32_t> &offsets,
+                   std::vector<uint32_t> &counts, uint32_t &tile_w,
+                   uint32_t &tile_h) const;
 
   // 读取 strip/tile 的原始（压缩）字节。
-  bool loadStrip(size_t index, std::vector<uint8_t>& out) const;
-  bool loadTile(size_t index, std::vector<uint8_t>& out) const;
-  bool loadBytes(uint32_t offset, uint32_t length, std::vector<uint8_t>& out) const;
+  bool loadStrip(size_t index, std::vector<uint8_t> &out) const;
+  bool loadTile(size_t index, std::vector<uint8_t> &out) const;
+  bool loadBytes(uint32_t offset, uint32_t length,
+                 std::vector<uint8_t> &out) const;
 
   // 打印文件头信息（供 image_codec_tiff_info）。
-  void printInfo(FILE* fp) const;
+  void printInfo(FILE *fp) const;
 
 private:
   enum class ByteOrder { Little, Big };
@@ -101,17 +113,17 @@ private:
     uint16_t tag = 0;
     uint16_t type = 0;
     uint32_t count = 0;
-    uint8_t value_bytes[4] = {0, 0, 0, 0};  // Value 字段原始 4 字节
-    uint32_t value = 0;                     // value_bytes 按文件字节序解释（数组时为偏移）
+    uint8_t value_bytes[4] = {0, 0, 0, 0}; // Value 字段原始 4 字节
+    uint32_t value = 0; // value_bytes 按文件字节序解释（数组时为偏移）
   };
 
   bool parseHeader();
   bool parseIfd();
-  bool readEntryRaw(const IfdEntry& e, std::vector<uint8_t>& out) const;
+  bool readEntryRaw(const IfdEntry &e, std::vector<uint8_t> &out) const;
   uint16_t readU16(size_t off) const;
   uint32_t readU32(size_t off) const;
-  uint16_t readU16Bytes(const uint8_t* p) const;
-  uint32_t readU32Bytes(const uint8_t* p) const;
+  uint16_t readU16Bytes(const uint8_t *p) const;
+  uint32_t readU32Bytes(const uint8_t *p) const;
 
   std::vector<uint8_t> file_;
   ByteOrder order_ = ByteOrder::Little;
@@ -131,23 +143,27 @@ class TiffWriter {
 public:
   TiffWriter() = default;
   ~TiffWriter() = default;
-  TiffWriter(const TiffWriter&) = delete;
-  TiffWriter& operator=(const TiffWriter&) = delete;
+  TiffWriter(const TiffWriter &) = delete;
+  TiffWriter &operator=(const TiffWriter &) = delete;
 
   void reset();
 
   // strip 布局。compression: 1=none, 5=LZW。n_strips 个 strip。
+  // samples_per_pixel：1 = 灰度（Photometric=BlackIsZero），3 = RGB（Photometric=RGB）。
+  // 这个参数决定 BitsPerSample / SamplesPerPixel / Photometric 三个 tag，
+  // 因此**必须**与调用方实际写出的字节排布一致，不能在外面再猜一次。
   bool openStrip(int w, int h, int rows_per_strip, uint16_t compression,
-                 size_t n_strips);
+                 size_t n_strips, int samples_per_pixel = 3);
   // tile 布局（TileWidth/TileLength/TileOffsets/TileByteCounts）。
   bool openTile(int w, int h, uint32_t tile_w, uint32_t tile_h,
-                uint16_t compression, size_t n_tiles);
+                uint16_t compression, size_t n_tiles,
+                int samples_per_pixel = 3);
 
-  bool appendStrip(size_t idx, const void* data, size_t size);
-  bool appendTile(size_t idx, const void* data, size_t size);
+  bool appendStrip(size_t idx, const void *data, size_t size);
+  bool appendTile(size_t idx, const void *data, size_t size);
 
-  bool saveFile(const char* path) const;
-  const std::vector<uint8_t>& buffer() const { return buf_; }
+  bool saveFile(const char *path) const;
+  const std::vector<uint8_t> &buffer() const { return buf_; }
   size_t payloadBytes() const { return data_end_ - data_start_; }
 
 private:
@@ -162,14 +178,15 @@ private:
   uint32_t tile_w_ = 0;
   uint32_t tile_h_ = 0;
   uint16_t compression_ = kCompressionNone;
+  int spp_ = 3;
   size_t n_ = 0;
-  std::vector<uint32_t> offs_;   // 每 strip/tile 的文件偏移
-  std::vector<uint32_t> sizes_;  // 每 strip/tile 的字节数
-  std::vector<uint8_t> data_;    // payload 区（追加）
-  size_t data_start_ = 0;        // payload 区在最终文件中的起始偏移
-  size_t data_end_ = 0;          // payload 区结尾（= data_.size()）
-  std::vector<uint8_t> buf_;     // 最终组装结果
+  std::vector<uint32_t> offs_;  // 每 strip/tile 的文件偏移
+  std::vector<uint32_t> sizes_; // 每 strip/tile 的字节数
+  std::vector<uint8_t> data_;   // payload 区（追加）
+  size_t data_start_ = 0;       // payload 区在最终文件中的起始偏移
+  size_t data_end_ = 0;         // payload 区结尾（= data_.size()）
+  std::vector<uint8_t> buf_;    // 最终组装结果
 };
 
-}  // namespace tiff
-}  // namespace image_codec
+} // namespace tiff
+} // namespace image_codec

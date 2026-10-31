@@ -48,18 +48,21 @@ typedef enum image_codec_backend {
   IMAGE_CODEC_BACKEND_CPU = 2     // 纯 CPU
 } image_codec_backend;
 
-// 图像容器格式。
+// 图像容器格式。数值与其它后端（CUDA / Vulkan）保持一致。
 typedef enum image_codec_format {
   IMAGE_CODEC_FORMAT_JPEG = 0,
-  IMAGE_CODEC_FORMAT_TIFF = 1
+  IMAGE_CODEC_FORMAT_TIFF = 1,
+  IMAGE_CODEC_FORMAT_PNG = 2
 } image_codec_format;
 
-// 解码产物/编码输入：24-bit RGB，top-down 行序（第 0 行为图像顶部）。
+// 解码产物/编码输入：top-down 行序（第 0 行为图像顶部）。
+// channels == 1（灰度）或 3（RGB）。**通道保真**：1 通道源解出来仍是 1 通道，
+// 绝不静默升维成 3 通道。
 // data 指向 width*height*channels 字节；stride 为每行字节数（通常 = width*channels）。
 typedef struct image_codec_image {
   uint32_t width;
   uint32_t height;
-  uint32_t channels; // 恒为 3（RGB）
+  uint32_t channels; // 1 = 灰度, 3 = RGB
   uint8_t *data;     // malloc'd，由 image_codec_image_free 释放
   size_t stride;     // 每行字节数
   size_t data_size;  // 像素数据字节数
@@ -68,10 +71,16 @@ typedef struct image_codec_image {
 // 编码参数。字段按目标格式选用：
 //   JPEG: jpeg_quality（1..100）
 //   TIFF: tiff_compression（1=none, 5=LZW）、tiff_rows_per_strip（0=自动/整幅）
+//   PNG:  png_compression（0..9，<0 用默认 6）、png_filter（-1=自适应，0..4=固定）
 typedef struct image_codec_encode_params {
   int jpeg_quality;
+  // 0 = 按质量自动（>=92 用 4:4:4，否则 4:2:0）；444 / 422 / 420 = 强制。
+  // 灰度（1 通道）恒为 4:4:4：没有色度可下采样。
+  int jpeg_subsampling;
   int tiff_compression;
   int tiff_rows_per_strip;
+  int png_compression;
+  int png_filter;
 } image_codec_encode_params;
 
 // 不透明编解码器句柄。

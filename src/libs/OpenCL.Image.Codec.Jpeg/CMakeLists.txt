@@ -15,8 +15,6 @@ add_library(OpenCLImageCodec.Jpeg STATIC
   src/jpeg_dct_ocl.cpp
   src/jpeg_codec.h
   src/jpeg_codec.cpp
-  src/bmp_io.h
-  src/bmp_io.cpp
   src/jpeg_test.h
   src/jpeg_test.cpp
   src/kernels/jpeg_dec.cl
@@ -25,7 +23,8 @@ add_library(OpenCLImageCodec.Jpeg STATIC
 target_include_directories(OpenCLImageCodec.Jpeg PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(OpenCLImageCodec.Jpeg PUBLIC
-  OpenCLImageCodec.Core)
+  OpenCLImageCodec.Core
+  OpenCLImageCodec.Common)
 
 # 命名空间别名：target_link_libraries(app PRIVATE OpenCLImageCodec::Jpeg)
 add_library(OpenCLImageCodec::Jpeg ALIAS OpenCLImageCodec.Jpeg)

@@ -67,3 +67,14 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# CMake 产物：*.cpp.in 是**模板，必须提交**；这里忽略的是 configure_file
+# 生成的对等 .cpp。正常构建落在 build/ 目录（已被忽略），这段只是防止
+# in-source 构建把产物写进源码树后被误提交。
+jpeg_cl_strings.cpp
+png_cl_strings.cpp
+metrics_cl.cpp
+lzw_encode_cl.cpp
+lzw_encode_tile_cl.cpp
+lzw_decode_cl.cpp
+lzw_decode_par_cl.cpp

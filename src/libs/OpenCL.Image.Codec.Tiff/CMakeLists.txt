@@ -35,8 +35,6 @@ add_library(OpenCLImageCodec.Tiff STATIC
   src/lzw_decode_ocl.cpp
   src/lzw_codec.h
   src/lzw_codec.cpp
-  src/bmp_io.h
-  src/bmp_io.cpp
   src/tiff_test.h
   src/tiff_test.cpp
   "${CMAKE_CURRENT_BINARY_DIR}/lzw_encode_cl.cpp"
@@ -49,7 +47,8 @@ target_include_directories(OpenCLImageCodec.Tiff PUBLIC
 target_include_directories(OpenCLImageCodec.Tiff PRIVATE
   "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(OpenCLImageCodec.Tiff PUBLIC
-  OpenCLImageCodec.Core)
+  OpenCLImageCodec.Core
+  OpenCLImageCodec.Common)
 
 # 命名空间别名：target_link_libraries(app PRIVATE OpenCLImageCodec::Tiff)
 add_library(OpenCLImageCodec::Tiff ALIAS OpenCLImageCodec.Tiff)

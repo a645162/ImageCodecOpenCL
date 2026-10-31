@@ -126,7 +126,7 @@ __kernel void dequant_idct(__global const float* coeffs, int coeff_off,
 __kernel void ycbcr_to_rgb(__global const float* planes, __constant int* desc,
                            int max_h, int max_v, int ncomp,
                            __global uchar* out, int out_stride, int width,
-                           int height) {
+                           int height, int out_channels) {
   int x = get_global_id(0);
   int y = get_global_id(1);
   if (x >= width || y >= height) return;
@@ -149,7 +149,13 @@ __kernel void ycbcr_to_rgb(__global const float* planes, __constant int* desc,
   if (g > 255) g = 255;
   if (b < 0) b = 0;
   if (b > 255) b = 255;
-  int o = y * out_stride + x * 3;
+  // 输出通道数与输入分量数一致：单分量 JPEG 就写 1 字节/像素，
+  // 绝不在这里把灰度复制成 RGB（通道保真）。
+  int o = y * out_stride + x * out_channels;
+  if (out_channels == 1) {
+    out[o] = (uchar)yv;
+    return;
+  }
   out[o + 0] = (uchar)r;
   out[o + 1] = (uchar)g;
   out[o + 2] = (uchar)b;

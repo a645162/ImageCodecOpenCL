@@ -3,9 +3,11 @@
 // 集成各模块测试入口（C linkage，见各 *_test.h）：
 //   - JPEG : image_codec_jpeg_info / image_codec_jpeg_decode / image_codec_jpeg_encode
 //   - TIFF : image_codec_tiff_info / image_codec_tiff_decode / image_codec_tiff_encode
+//   - PNG  : image_codec_png_info / image_codec_png_decode / image_codec_png_encode
 #include "jpeg_test.h"
 #include "ocl_device.h"
 #include "image_codec_platform.h"
+#include "png_test.h"
 #include "tiff_test.h"
 
 #include <cstdio>
@@ -18,22 +20,27 @@ using namespace image_codec;
 
 namespace {
 
-enum class FileFormat { Unknown, Jpeg, Tiff };
+enum class FileFormat { Unknown, Jpeg, Tiff, Png };
 
 FileFormat detect_format(const char *path) {
   FILE *f = std::fopen(path, "rb");
   if (f == nullptr) {
     return FileFormat::Unknown;
   }
-  unsigned char head[4] = {0};
-  const size_t n = std::fread(head, 1, 4, f);
+  unsigned char head[8] = {0};
+  const size_t n = std::fread(head, 1, sizeof(head), f);
   std::fclose(f);
+  if (n >= 8 && head[0] == 0x89 && head[1] == 'P' && head[2] == 'N' &&
+      head[3] == 'G') {
+    return FileFormat::Png;
+  }
   if (n >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF) {
     return FileFormat::Jpeg;
   }
-  if (n >= 4 &&
-      ((head[0] == 0x49 && head[1] == 0x49 && head[2] == 0x2A && head[3] == 0x00) ||
-       (head[0] == 0x4D && head[1] == 0x4D && head[2] == 0x00 && head[3] == 0x2A))) {
+  if (n >= 4 && ((head[0] == 0x49 && head[1] == 0x49 && head[2] == 0x2A &&
+                  head[3] == 0x00) ||
+                 (head[0] == 0x4D && head[1] == 0x4D && head[2] == 0x00 &&
+                  head[3] == 0x2A))) {
     return FileFormat::Tiff;
   }
   return FileFormat::Unknown;
@@ -41,9 +48,14 @@ FileFormat detect_format(const char *path) {
 
 const char *format_name(FileFormat f) {
   switch (f) {
-    case FileFormat::Jpeg: return "JPEG";
-    case FileFormat::Tiff: return "TIFF";
-    default: return "unknown";
+  case FileFormat::Jpeg:
+    return "JPEG";
+  case FileFormat::Tiff:
+    return "TIFF";
+  case FileFormat::Png:
+    return "PNG";
+  default:
+    return "unknown";
   }
 }
 
@@ -85,10 +97,13 @@ void print_usage() {
       "Usage: image_codec <command> [options]\n"
       "Commands:\n"
       "  list-devices                                Enumerate OpenCL devices\n"
-      "  info <in>                                   Print file header info (jpeg/tiff)\n"
+      "  info <in>                                   Print file header info "
+      "(jpeg/tiff/png)\n"
       "  decode <in> <out> [--backend opencl|cpu]\n"
       "  encode <in> <out> [--backend opencl|cpu]\n"
-      "            [--jpeg-quality N] [--tiff-compression 1|5] [--rows-per-strip N]\n"
+      "            [--jpeg-quality N] [--jpeg-subsampling 444|422|420]\n"
+      "            [--tiff-compression 1|5] [--rows-per-strip N]\n"
+      "            [--png-level 0..9] [--png-filter -1|0..4]\n"
       "  bench <in> [--iterations N] [--backend opencl|cpu]\n");
 }
 
@@ -120,7 +135,11 @@ int cmd_info(int argc, char **argv) {
   if (fmt == FileFormat::Tiff) {
     return image_codec_tiff_info(in);
   }
-  std::fprintf(stderr, "info: unrecognized format (need JPEG or TIFF): %s\n", in);
+  if (fmt == FileFormat::Png) {
+    return image_codec_png_info(in);
+  }
+  std::fprintf(stderr, "info: unrecognized format (need JPEG/TIFF/PNG): %s\n",
+               in);
   return 2;
 }
 
@@ -139,13 +158,15 @@ int cmd_decode(int argc, char **argv) {
   }
   const FileFormat fmt = detect_format(in);
   switch (fmt) {
-    case FileFormat::Jpeg:
-      return image_codec_jpeg_decode(in, out, backend == 2 ? 1 : 0);
-    case FileFormat::Tiff:
-      return image_codec_tiff_decode(in, out, backend);
-    default:
-      std::fprintf(stderr, "decode: unrecognized format: %s\n", in);
-      return 2;
+  case FileFormat::Jpeg:
+    return image_codec_jpeg_decode(in, out, backend == 2 ? 1 : 0);
+  case FileFormat::Tiff:
+    return image_codec_tiff_decode(in, out, backend);
+  case FileFormat::Png:
+    return image_codec_png_decode(in, out, backend);
+  default:
+    std::fprintf(stderr, "decode: unrecognized format: %s\n", in);
+    return 2;
   }
 }
 
@@ -160,6 +181,9 @@ FileFormat out_format(const char *out) {
   }
   if (std::strcmp(dot, ".tif") == 0 || std::strcmp(dot, ".tiff") == 0) {
     return FileFormat::Tiff;
+  }
+  if (std::strcmp(dot, ".png") == 0) {
+    return FileFormat::Png;
   }
   return FileFormat::Unknown;
 }
@@ -179,24 +203,34 @@ int cmd_encode(int argc, char **argv) {
   }
   const FileFormat fmt = out_format(out);
   switch (fmt) {
-    case FileFormat::Jpeg: {
-      const int quality = find_opt_int(argc, argv, "--jpeg-quality", 85);
-      return image_codec_jpeg_encode(in, out, backend == 2 ? 1 : 0, quality);
-    }
-    case FileFormat::Tiff: {
-      const int compression = find_opt_int(argc, argv, "--tiff-compression", 5);
-      const int rows_per_strip = find_opt_int(argc, argv, "--rows-per-strip", 0);
-      return image_codec_tiff_encode(in, out, backend, compression, rows_per_strip);
-    }
-    default:
-      std::fprintf(stderr, "encode: unsupported output extension (use .jpg/.jpeg/.tif/.tiff)\n");
-      return 2;
+  case FileFormat::Jpeg: {
+    const int quality = find_opt_int(argc, argv, "--jpeg-quality", 85);
+    const int subsampling = find_opt_int(argc, argv, "--jpeg-subsampling", 0);
+    return image_codec_jpeg_encode(in, out, backend == 2 ? 1 : 0, quality,
+                                   subsampling);
+  }
+  case FileFormat::Tiff: {
+    const int compression = find_opt_int(argc, argv, "--tiff-compression", 5);
+    const int rows_per_strip = find_opt_int(argc, argv, "--rows-per-strip", 0);
+    return image_codec_tiff_encode(in, out, backend, compression,
+                                   rows_per_strip);
+  }
+  case FileFormat::Png: {
+    const int level = find_opt_int(argc, argv, "--png-level", 6);
+    const int filter = find_opt_int(argc, argv, "--png-filter", -1);
+    return image_codec_png_encode(in, out, backend, level, filter);
+  }
+  default:
+    std::fprintf(stderr, "encode: unsupported output extension "
+                         "(use .jpg/.jpeg/.tif/.tiff/.png)\n");
+    return 2;
   }
 }
 
 int cmd_bench(int argc, char **argv) {
   if (argc < 2) {
-    std::fprintf(stderr, "bench: usage bench <in> [--iterations N] [--backend ...]\n");
+    std::fprintf(stderr,
+                 "bench: usage bench <in> [--iterations N] [--backend ...]\n");
     return 2;
   }
   const char *in = argv[1];
@@ -219,23 +253,28 @@ int cmd_bench(int argc, char **argv) {
     int rc = 0;
     if (fmt == FileFormat::Jpeg) {
       rc = image_codec_jpeg_decode(in, tmp_out, backend == 2 ? 1 : 0);
+    } else if (fmt == FileFormat::Png) {
+      rc = image_codec_png_decode(in, tmp_out, backend);
     } else {
       rc = image_codec_tiff_decode(in, tmp_out, backend);
     }
     if (rc != 0) {
-      std::fprintf(stderr, "bench: decode failed at iteration %d (rc=%d)\n", i, rc);
+      std::fprintf(stderr, "bench: decode failed at iteration %d (rc=%d)\n", i,
+                   rc);
       return 1;
     }
   }
   const long long dt = image_codec_now_ns() - t0;
-  const double per = static_cast<double>(dt) / static_cast<double>(iterations) / 1e6;
-  std::printf("bench: %s -> %d decodes in %.3f ms total, %.3f ms/decode (%.1f fps)\n",
-              in, iterations, static_cast<double>(dt) / 1e6, per,
-              1000.0 / (per > 0 ? per : 1e-9));
+  const double per =
+      static_cast<double>(dt) / static_cast<double>(iterations) / 1e6;
+  std::printf(
+      "bench: %s -> %d decodes in %.3f ms total, %.3f ms/decode (%.1f fps)\n",
+      in, iterations, static_cast<double>(dt) / 1e6, per,
+      1000.0 / (per > 0 ? per : 1e-9));
   return 0;
 }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char **argv) {
   if (argc < 2) {
