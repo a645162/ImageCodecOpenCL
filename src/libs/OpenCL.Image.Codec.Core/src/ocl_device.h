@@ -1,3 +1,11 @@
+/*
+ * File: ocl_device.h
+ * Brief: Ocl device.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // opencl/ocl_device.h - OpenCL 平台/设备枚举与上下文/命令队列管理。
 #pragma once
 

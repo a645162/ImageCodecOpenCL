@@ -1,3 +1,11 @@
+/*
+ * File: lzw_decode_cpu.cpp
+ * Brief: Lzw decode cpu.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_decode_cpu.cpp - CPU LZW 解码实现。
 //
 // 字符串表用「前缀链」表示：code -> (prefix_code, suffix_byte)。

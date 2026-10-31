@@ -1,3 +1,11 @@
+<!--
+ * File: README.md
+ * Brief: TIFF 模块.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+-->
+
 # TIFF 模块
 
 - `lzw_codec.*`：统一编解码入口（encode 可选 GPU/CPU；decode 保持 CPU 默认）。

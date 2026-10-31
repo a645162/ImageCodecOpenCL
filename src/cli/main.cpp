@@ -1,3 +1,11 @@
+/*
+ * File: main.cpp
+ * Brief: Main.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // cli/main.cpp - OpenCL-Image-Codec 测试 CLI（单可执行 + 子命令）。
 //
 // 集成各模块测试入口（C linkage，见各 *_test.h）：

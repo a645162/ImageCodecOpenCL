@@ -1,3 +1,11 @@
+/*
+ * File: cpp_example.cpp
+ * Brief: Cpp example.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // examples/cpp_example.cpp - C++ 示例：使用 image_codec.hpp RAII 包装。
 //
 // 用法：image_codec_example_cpp <in.bmp> <out-prefix>

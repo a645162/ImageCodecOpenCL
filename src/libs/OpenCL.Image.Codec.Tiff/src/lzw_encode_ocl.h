@@ -1,3 +1,11 @@
+/*
+ * File: lzw_encode_ocl.h
+ * Brief: Lzw encode ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_encode_ocl.h - GPU LZW 编码（strip/tile 并行 kernel，内核源码内嵌）。
 #pragma once
 

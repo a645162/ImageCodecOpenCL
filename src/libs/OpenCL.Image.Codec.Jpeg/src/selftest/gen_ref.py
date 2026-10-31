@@ -6,6 +6,12 @@
   ref_444_q95.jpg ...          PIL(libjpeg) 编码的 baseline JPEG（4:4:4 / 4:2:0 / 4:2:2 / 灰度 / 8x8）
   *_pil.bmp                    PIL 解码的参考像素（与我们的解码对比）
 依赖: pip install pillow numpy
+
+File: gen_ref.py
+Brief: Gen ref.
+Author: Haomin Kong
+Email: a645162@163.com
+Created: 2026-08-12
 """
 import argparse
 import os

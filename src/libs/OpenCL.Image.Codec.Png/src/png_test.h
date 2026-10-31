@@ -1,3 +1,11 @@
+/*
+ * File: png_test.h
+ * Brief: Png test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // png_test.h - PNG 模块的文件入口（供上层 C API 集成，签名固定，C 链接）。
 #pragma once
 

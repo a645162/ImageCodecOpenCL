@@ -1,3 +1,11 @@
+/*
+ * File: ocl_program.h
+ * Brief: Ocl program.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // opencl/ocl_program.h - 从 OpenCL C 源码构建 program/kernel 的工具。
 #pragma once
 

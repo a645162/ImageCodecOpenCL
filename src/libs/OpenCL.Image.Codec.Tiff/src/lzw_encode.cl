@@ -1,3 +1,11 @@
+/*
+ * File: lzw_encode.cl
+ * Brief: Lzw encode.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // TIFF LZW encoder kernel, strip-parallel (OpenCL 1.2)。
 // 每个 work-item 独立编码一条 strip，使用全局内存中的开放寻址哈希字典。
 // 字典槽位打包为 uint：((key+1)<<12) | code（一次探测一次内存访问）。

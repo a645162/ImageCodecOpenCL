@@ -1,3 +1,9 @@
+# File: tests/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-10-31
+
 # OpenCL 后端的自检（返回码约定：0 = PASS、2 = SKIP、其它 = FAIL）。
 
 add_executable(metrics_test metrics_test.cpp)

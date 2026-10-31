@@ -1,3 +1,11 @@
+/*
+ * File: image_codec.cpp
+ * Brief: Image codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/api/image_codec.cpp - 对外 C API 实现。
 //
 // 本层直接调用各模块的**内存缓冲**入口（png::decodePng / tiffDecodeFromBuffer /

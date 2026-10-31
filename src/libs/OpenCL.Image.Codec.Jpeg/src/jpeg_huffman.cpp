@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_huffman.cpp
+ * Brief: Jpeg huffman.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_huffman.cpp - CPU 熵编解码实现。
 #include "jpeg_huffman.h"
 

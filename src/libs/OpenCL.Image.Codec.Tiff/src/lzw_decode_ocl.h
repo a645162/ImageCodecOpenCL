@@ -1,3 +1,11 @@
+/*
+ * File: lzw_decode_ocl.h
+ * Brief: Lzw decode ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_decode_ocl.h - GPU LZW 解码（探索项，阶段 1.5）。
 //
 // ============================================================================

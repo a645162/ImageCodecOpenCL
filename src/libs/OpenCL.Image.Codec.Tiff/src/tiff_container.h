@@ -1,3 +1,11 @@
+/*
+ * File: tiff_container.h
+ * Brief: Tiff container.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/tiff_container.h - TIFF 6.0 容器读写（LE/BE、IFD/Tag 解析与写出）。
 #pragma once
 

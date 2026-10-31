@@ -1,3 +1,11 @@
+/*
+ * File: lzw_codec.h
+ * Brief: Lzw codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_codec.h - 统一编解码入口（encode 选 GPU/CPU，decode 选 CPU）。
 #pragma once
 

@@ -1,3 +1,11 @@
+/*
+ * File: image_codec.hpp
+ * Brief: Image codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // image_codec.hpp - OpenCL-Image-Codec C++ RAII 包装（纯头，基于 image_codec.h）。
 //
 // 用法：

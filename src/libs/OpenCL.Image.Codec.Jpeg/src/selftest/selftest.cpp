@@ -1,3 +1,11 @@
+/*
+ * File: selftest.cpp
+ * Brief: Selftest.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/selftest/selftest.cpp - JPEG 模块自测（临时，默认关闭）。
 // 用法: image_codec_jpeg_selftest <workdir>
 //   workdir 内需有由 gen_ref.py 生成的：

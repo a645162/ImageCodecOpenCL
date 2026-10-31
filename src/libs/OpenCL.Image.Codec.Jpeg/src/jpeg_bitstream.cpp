@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_bitstream.cpp
+ * Brief: Jpeg bitstream.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_bitstream.cpp - baseline JPEG 容器解析与组帧实现。
 #include "jpeg_bitstream.h"
 

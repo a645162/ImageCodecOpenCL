@@ -1,3 +1,11 @@
+/*
+ * File: bmp_io.cpp
+ * Brief: Bmp io.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // bmp_io.cpp - BMP 读写实现（8-bit 灰度 / 24-bit RGB）。
 #include "bmp_io.h"
 

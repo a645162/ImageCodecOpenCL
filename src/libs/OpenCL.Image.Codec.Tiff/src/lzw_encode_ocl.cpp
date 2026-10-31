@@ -1,3 +1,11 @@
+/*
+ * File: lzw_encode_ocl.cpp
+ * Brief: Lzw encode ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_encode_ocl.cpp - GPU LZW 编码实现。
 #include "lzw_encode_ocl.h"
 

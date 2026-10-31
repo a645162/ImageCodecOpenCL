@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Common/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-10-31
+
 # Common：三个编解码模块共用的宿主内存像素容器与 BMP 中转读写。
 #
 # 为什么单独成库：TIFF / PNG / JPEG 都要「BMP 进、编码出」和「解码出、BMP 出」，

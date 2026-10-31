@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_dec.cl
+ * Brief: Jpeg dec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/kernels/jpeg_dec.cl - 解码 GPU kernels：
 //   1) dequant_idct : 反量化 + 2D IDCT（逐 8x8 块，输出整数化 0..255 float 平面）
 //   2) ycbcr_to_rgb : YCbCr->RGB + 色度上采样（4:2:0 h2v2 / 4:2:2 h2v1，libjpeg 三角滤波）

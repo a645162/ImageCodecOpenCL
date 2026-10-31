@@ -1,3 +1,11 @@
+/*
+ * File: metrics_common.h
+ * Brief: Metrics common.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // metrics_common.h - MSE/PSNR/SSIM/MS-SSIM 的共享定义（CPU 参考与 kernel 共用）。
 //
 // 常数、权重表、PSNR 换算、MS-SSIM 合成、2x2 下采样各只有一份：GPU 与 CPU

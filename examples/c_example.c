@@ -1,3 +1,11 @@
+/*
+ * File: c_example.c
+ * Brief: C example.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // examples/c_example.c - 纯 C 示例：使用 image_codec.h C API。
 //
 // 用法：image_codec_example_c <in.bmp> <out-prefix>

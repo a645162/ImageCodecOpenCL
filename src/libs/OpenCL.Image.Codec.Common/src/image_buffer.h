@@ -1,3 +1,11 @@
+/*
+ * File: image_buffer.h
+ * Brief: Image buffer.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // image_buffer.h - 各编解码模块共用的宿主内存图像缓冲（top-down 行序）。
 //
 // 为什么要有这一层：OpenCL 后端的三个格式（TIFF / PNG / JPEG）以前各自揣着一份

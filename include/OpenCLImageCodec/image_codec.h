@@ -1,3 +1,11 @@
+/*
+ * File: image_codec.h
+ * Brief: Image codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // image_codec.h - OpenCL-Image-Codec 对外 C API（纯 C，C11）。
 //
 // 用法：

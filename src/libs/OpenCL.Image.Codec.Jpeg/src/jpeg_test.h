@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_test.h
+ * Brief: Jpeg test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_test.h - JPEG CLI 测试入口（供上层集成，签名固定，C 链接）。
 #pragma once
 

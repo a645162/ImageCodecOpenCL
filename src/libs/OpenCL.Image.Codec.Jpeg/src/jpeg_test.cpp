@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_test.cpp
+ * Brief: Jpeg test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_test.cpp - JPEG CLI 测试入口实现。
 #include "jpeg_test.h"
 

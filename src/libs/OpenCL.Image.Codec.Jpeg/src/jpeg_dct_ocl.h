@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_dct_ocl.h
+ * Brief: Jpeg dct ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_dct_ocl.h - GPU DCT/颜色变换（OpenCL）与纯 CPU 参考路径。
 // 解码：量化系数 -> GPU(反量化+IDCT+YCbCr->RGB+上采样) -> RGB。
 // 编码：RGB -> GPU(RGB->YCbCr+下采样+FDCT+量化) -> 量化系数。

@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_bitstream.h
+ * Brief: Jpeg bitstream.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_bitstream.h - baseline JPEG 容器解析与组帧（SOI/APPn/DQT/DHT/SOF0/SOS/DRI/EOI）。
 // 混合编解码策略：本模块只负责容器（marker/segment/表/MCU 布局）与文件写出，
 // 熵编解码见 jpeg_huffman.*，DCT/颜色变换见 jpeg_dct_ocl.*。

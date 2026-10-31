@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Png/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-10-31
+
 # PNG 模块：容器/CRC/zlib 在 CPU，行滤波（filter + 自适应选择）在 OpenCL。
 #
 # 为什么要 zlib 依赖：deflate 留在 CPU 是刻意的——这些尺寸下 GPU deflate 没有收益，

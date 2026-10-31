@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_enc.cl
+ * Brief: Jpeg enc.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/kernels/jpeg_enc.cl - 编码 GPU kernels：
 //   1) rgb_to_ycbcr_full : RGB->YCbCr（全分辨率平面，边缘复制补齐）
 //   2) downsample_chroma : 4:2:0 色度 2x2 盒式下采样（libjpeg h2v2_downsample）

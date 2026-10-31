@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_huffman.h
+ * Brief: Jpeg huffman.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_huffman.h - CPU 熵编解码（Huffman）。
 // 解码：位流 -> 量化 DCT 系数（zigzag 顺序转自然序，DC 差分+符号扩展+AC RLE）。
 // 编码：量化系数 -> 位流（标准表）。

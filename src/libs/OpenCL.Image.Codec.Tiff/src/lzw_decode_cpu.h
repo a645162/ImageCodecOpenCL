@@ -1,3 +1,11 @@
+/*
+ * File: lzw_decode_cpu.h
+ * Brief: Lzw decode cpu.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_decode_cpu.h - CPU LZW 解码（对齐 libtiff 编码器语义）。
 #pragma once
 

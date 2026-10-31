@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Core/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # 核心基础设施：平台抽象（exe_dir/计时/休眠）+ OpenCL 设备/上下文/kernel 构建。
 add_library(OpenCLImageCodec.Core STATIC
   src/image_codec_platform.h

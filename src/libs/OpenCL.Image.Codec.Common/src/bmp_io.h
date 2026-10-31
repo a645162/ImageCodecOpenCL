@@ -1,3 +1,11 @@
+/*
+ * File: bmp_io.h
+ * Brief: Bmp io.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // bmp_io.h - BMP 读写（8-bit 灰度 / 24-bit RGB / 32-bit RGBA），top-down RGB 语义。
 //
 // 位置说明：BMP 在本库里是**模块之间的中转格式**（CLI 与文件级便捷入口用它，

@@ -1,3 +1,11 @@
+/*
+ * File: lzw_decode_ocl.cpp
+ * Brief: Lzw decode ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_decode_ocl.cpp - GPU LZW 解码（段级并行探索实现，见 lzw_decode_ocl.h）。
 //
 // 流程：段扫描(host, 串行, 找 ClearCode 段边界并校验码流) -> 两遍 kernel

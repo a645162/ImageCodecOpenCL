@@ -1,3 +1,11 @@
+/*
+ * File: lzw_codec.cpp
+ * Brief: Lzw codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/lzw_codec.cpp - 统一编解码入口实现。
 #include "lzw_codec.h"
 

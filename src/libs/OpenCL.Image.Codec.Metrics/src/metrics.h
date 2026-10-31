@@ -1,3 +1,11 @@
+/*
+ * File: metrics.h
+ * Brief: Metrics.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // metrics.h - 画质指标（MSE / PSNR / SSIM / MS-SSIM）的 OpenCL 实现入口。
 //
 // 与 CUDA 后端（ImageCodecCUDA::Metrics）共用同一套定义，见

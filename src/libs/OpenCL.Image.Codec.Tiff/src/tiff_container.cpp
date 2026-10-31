@@ -1,3 +1,11 @@
+/*
+ * File: tiff_container.cpp
+ * Brief: Tiff container.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/tiff_container.cpp - TIFF 6.0 容器读写实现。
 #include "tiff_container.h"
 

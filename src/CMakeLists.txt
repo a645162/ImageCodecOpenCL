@@ -1,3 +1,9 @@
+# File: src/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # src/ 下为多个独立静态库项目（参照主项目 src/libs 组织），用户可按需链接。
 # 每个库提供命名空间别名，例如：
 #   target_link_libraries(app PRIVATE OpenCLImageCodec::Tiff)   # 仅 TIFF（PUBLIC 传播 Core）

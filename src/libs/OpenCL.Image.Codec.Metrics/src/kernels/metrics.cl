@@ -1,3 +1,11 @@
+/*
+ * File: metrics.cl
+ * Brief: Metrics.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // metrics.cl - MSE / SSIM / MS-SSIM 的 OpenCL kernel（单尺度累加）。
 //
 // 并行形态：一个工作项负责一个 (像素, 通道)。

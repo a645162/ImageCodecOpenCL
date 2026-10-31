@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Api/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # 对外 C API（include/OpenCLImageCodec/image_codec.h / image_codec.hpp 的实现库）。
 # 桥接各模块文件入口（image_codec_*_test.h）与内存 buffer。
 add_library(OpenCLImageCodec.Api STATIC

@@ -1,3 +1,11 @@
+/*
+ * File: ocl_device.cpp
+ * Brief: Ocl device.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 #include "ocl_device.h"
 
 #include <cstdio>

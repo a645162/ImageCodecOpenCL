@@ -1,3 +1,11 @@
+/*
+ * File: lzw_decode.cl
+ * Brief: Lzw decode.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // TIFF LZW decoder kernel, SEGMENT-parallel (OpenCL 1.2)。
 // 每个 work-item 独立解码一个「段」（段 = 相邻两次 ClearCode/EOI 之间的码序列，
 // 段内字典独立，可从 ClearCode 之后的字面量重新开始，故可并行）。

@@ -1,3 +1,11 @@
+<!--
+ * File: README.md
+ * Brief: OpenCL-Image-Codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+-->
+
 # OpenCL-Image-Codec
 
 通过 vcpkg 获取 OpenCL，CMake 子项目组织，独立构建；对外提供稳定 C API（另附 C++ 包装）与测试 CLI。

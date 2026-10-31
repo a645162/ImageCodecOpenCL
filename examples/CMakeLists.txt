@@ -1,3 +1,9 @@
+# File: examples/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # 示例：纯 C 与 C++ 两种消费方式，均走对外 OpenCLImageCodec::OpenCLImageCodec。
 add_executable(image_codec_example_c c_example.c)
 target_link_libraries(image_codec_example_c PRIVATE OpenCLImageCodec::OpenCLImageCodec)

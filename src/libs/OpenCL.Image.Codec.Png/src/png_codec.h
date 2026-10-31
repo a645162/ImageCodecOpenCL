@@ -1,3 +1,11 @@
+/*
+ * File: png_codec.h
+ * Brief: Png codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // png_codec.h - PNG 编解码门面（GPU 行滤波 + zlib）。
 #pragma once
 

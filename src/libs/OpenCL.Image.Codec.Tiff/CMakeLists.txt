@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Tiff/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # TIFF 模块：容器读写 + LZW 编码(GPU)/解码(CPU)。
 
 # ---- 内嵌 kernel 源码生成 C++ 字符串（file(READ) + configure_file）----

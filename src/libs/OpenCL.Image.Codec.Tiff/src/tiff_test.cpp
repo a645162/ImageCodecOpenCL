@@ -1,3 +1,11 @@
+/*
+ * File: tiff_test.cpp
+ * Brief: Tiff test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/tiff_test.cpp - CLI 测试入口实现（BMP <-> TIFF）。
 #include "tiff_test.h"
 

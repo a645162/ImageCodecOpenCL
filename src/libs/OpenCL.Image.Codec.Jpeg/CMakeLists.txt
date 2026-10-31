@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Jpeg/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-08-12
+
 # JPEG 模块：OpenCL 混合编解码（Huffman 熵编解码 CPU + DCT/颜色变换 GPU）。
 
 # ---- 内嵌 OpenCL kernel 源码：file(READ) + configure_file 生成 C 字符串 ----

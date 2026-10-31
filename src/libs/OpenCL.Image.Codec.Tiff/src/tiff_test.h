@@ -1,3 +1,11 @@
+/*
+ * File: tiff_test.h
+ * Brief: Tiff test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // tiff/tiff_test.h - CLI 测试入口（供 lead 集成 CLI；C 链接）。
 #pragma once
 

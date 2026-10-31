@@ -1,3 +1,11 @@
+/*
+ * File: metrics_test.cpp
+ * Brief: Metrics test.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-10-31
+ */
+
 // metrics_test.cpp - 画质指标的 OpenCL 自检。
 //
 // 检查的不是「能跑通」，而是三件最容易悄悄错的事：

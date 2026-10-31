@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_dct_ocl.cpp
+ * Brief: Jpeg dct ocl.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_dct_ocl.cpp - GPU DCT/颜色变换编排与纯 CPU 参考实现。
 #include "jpeg_dct_ocl.h"
 

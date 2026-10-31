@@ -1,3 +1,11 @@
+/*
+ * File: lzw_encode_tile.cl
+ * Brief: Lzw encode tile.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // TIFF LZW encoder kernel, TILE-parallel (OpenCL 1.2)。
 // 每个 work-item 独立编码一个 tile（TILE_H x TILE_W 像素，TILE_W == TILE_H == -DTILE_H）。
 // 图像由 host 预先填充到 tile 尺寸的整数倍；tile 像素按行主序消耗

@@ -1,3 +1,11 @@
+/*
+ * File: image_codec_platform.h
+ * Brief: Image codec platform.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // platform/image_codec_platform.h - 内部平台抽象（不对外导出）。
 #pragma once
 

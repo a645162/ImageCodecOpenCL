@@ -1,3 +1,11 @@
+/*
+ * File: jpeg_codec.h
+ * Brief: Jpeg codec.
+ * Author: Haomin Kong
+ * Email: a645162@163.com
+ * Created: 2026-08-12
+ */
+
 // src/jpeg/jpeg_codec.h - JPEG 混合编解码编排（读/写文件、CPU Huffman + GPU DCT）。
 #pragma once
 

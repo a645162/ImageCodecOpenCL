@@ -1,3 +1,9 @@
+# File: src/libs/OpenCL.Image.Codec.Metrics/CMakeLists.txt
+# Brief: CMake build configuration.
+# Author: Haomin Kong
+# Email: a645162@163.com
+# Created: 2026-10-31
+
 # 画质指标模块：MSE / PSNR / SSIM / MS-SSIM（OpenCL GPU + CPU 参考实现）。
 
 # ---- 内嵌 kernel 源码生成 C++ 字符串（file(READ) + configure_file）----
