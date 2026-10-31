@@ -47,6 +47,12 @@ bool channelsAllowed(image_codec_format format, int channels) {
   return true;
 }
 
+bool resourceFailure(const std::string &error) {
+  return error.find("CL_MEM_OBJECT_ALLOCATION_FAILURE") != std::string::npos ||
+         error.find("CL_OUT_OF_RESOURCES") != std::string::npos ||
+         error.find("CL_OUT_OF_HOST_MEMORY") != std::string::npos;
+}
+
 } // namespace
 
 // 下面这些辅助函数必须放在 extern "C" 之外：C 语言链接的符号没有名字修饰，
@@ -167,7 +173,8 @@ image_codec_status image_codec_codec_decode(image_codec_codec *codec,
     std::vector<uint8_t> file(in, in + in_len);
     image_codec::jpeg::JpegDecodeResult res;
     if (image_codec::jpeg::jpeg_decode_buffer(file, cpu ? 1 : 0, &res) != 0) {
-      return IMAGE_CODEC_ERR_DECODE_FAILED;
+      return resourceFailure(res.error) ? IMAGE_CODEC_ERR_OUT_OF_MEMORY
+                                        : IMAGE_CODEC_ERR_DECODE_FAILED;
     }
     img.width = res.width;
     img.height = res.height;
@@ -301,7 +308,8 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
             pixels, static_cast<int>(img->width), static_cast<int>(img->height),
             static_cast<int>(img->channels), jpeg_quality, jpeg_subsampling,
             cpu ? 1 : 0, &encoded, &err) != 0) {
-      return IMAGE_CODEC_ERR_ENCODE_FAILED;
+      return resourceFailure(err) ? IMAGE_CODEC_ERR_OUT_OF_MEMORY
+                                  : IMAGE_CODEC_ERR_ENCODE_FAILED;
     }
     break;
   }
@@ -328,7 +336,8 @@ image_codec_codec_encode(image_codec_codec *codec, image_codec_format format,
     bool gpu_used = false;
     if (!image_codec::ocl::png::encodePng(view, options, &encoded, &gpu_used,
                                           &err)) {
-      return IMAGE_CODEC_ERR_ENCODE_FAILED;
+      return resourceFailure(err) ? IMAGE_CODEC_ERR_OUT_OF_MEMORY
+                                  : IMAGE_CODEC_ERR_ENCODE_FAILED;
     }
     break;
   }
