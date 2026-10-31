@@ -117,11 +117,19 @@ int jpeg_encode_buffer(const std::vector<uint8_t> &rgb, int width, int height,
     img.max_h = img.max_v = 1;
     for (int c = 0; c < 3; c++) img.comp[c].h_samp = img.comp[c].v_samp = 1;
   } else if (subsampling == 420) {
+    img.max_h = 2;
+    img.max_v = 2;
     img.comp[0].h_samp = 2;
     img.comp[0].v_samp = 2;
     img.comp[1].h_samp = img.comp[1].v_samp = 1;
     img.comp[2].h_samp = img.comp[2].v_samp = 1;
   } else { // 422
+    // max_v 必须显式写 1：函数开头把 max_h/max_v 预置成 2/2 是 4:2:0 的形状，
+    // 直接沿用到 4:2:2 会让 mcus_y 按 16 行算、色度平面只写一半高度，而 SOF
+    // 里写的却是 v_samp=1——解码器按 8 行一组回读，于是整幅色度错位（实测平滑
+    // 渐变图 PSNR 从 32.8 dB 掉到 15.1 dB）。
+    img.max_h = 2;
+    img.max_v = 1;
     img.comp[0].h_samp = 2;
     img.comp[0].v_samp = 1;
     img.comp[1].h_samp = img.comp[1].v_samp = 1;

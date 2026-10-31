@@ -443,6 +443,10 @@ int jpeg_gpu_encode(const JpegImage &img, const uint8_t *rgb,
       clReleaseMemObject(cr_buf);
       return -1;
     }
+    // 抽取比例与着色器一致，从采样因子推导：4:2:2 只做水平抽取（v_ratio=1），
+    // 4:2:0 才是 2x2。写死 2x2 会让 4:2:2 的下半幅色度被 clamp 到同一行。
+    const int h_ratio = img.max_h / (c1.h_samp > 0 ? c1.h_samp : 1);
+    const int v_ratio = img.max_v / (c1.v_samp > 0 ? c1.v_samp : 1);
     for (int ch = 0; ch < 2; ch++) {
       cl_mem src = (ch == 0) ? cb_buf : cr_buf;
       cl_mem dst = (ch == 0) ? ds_cb : ds_cr;
@@ -457,6 +461,10 @@ int jpeg_gpu_encode(const JpegImage &img, const uint8_t *rgb,
       int ds_h = c1.blocks_y * 8;
       clSetKernelArg(g.k_ds, 6, sizeof(int), &ds_w);
       clSetKernelArg(g.k_ds, 7, sizeof(int), &ds_h);
+      int h_ratio_arg = h_ratio < 1 ? 1 : h_ratio;
+      int v_ratio_arg = v_ratio < 1 ? 1 : v_ratio;
+      clSetKernelArg(g.k_ds, 8, sizeof(int), &h_ratio_arg);
+      clSetKernelArg(g.k_ds, 9, sizeof(int), &v_ratio_arg);
       size_t dg[2] = {static_cast<size_t>(ds_w), static_cast<size_t>(ds_h)};
       e = clEnqueueNDRangeKernel(g.dev.queue(), g.k_ds, 2, nullptr, dg, nullptr,
                                  0, nullptr, nullptr);

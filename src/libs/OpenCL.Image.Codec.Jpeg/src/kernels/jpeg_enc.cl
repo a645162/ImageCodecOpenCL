@@ -24,24 +24,31 @@ __kernel void rgb_to_ycbcr(__global const uchar* rgb, int rgb_stride,
   cr_plane[y * plane_stride + x] = 128.0f + 0.5f * r - 0.418688f * g - 0.081312f * b;
 }
 
-// 色度 2x2 盒式下采样：(a+b+c+d+2)>>2（libjpeg 舍入）。dst 尺寸 dst_w x dst_h。
+// 色度盒式下采样：抽取比例由 h_ratio / v_ratio 给出，不能写死 2x2——
+// 4:2:2 的色度平面与亮度等高，只做水平抽取；写死 2x2 时 sy = y*2 会越过
+// 平面底部被 clamp 到同一行，下半幅色度被摊平（文件能开、亮度正常、颜色跑偏）。
+// 舍入统一为 (sum + count/2) / count：h2v2 即 (a+b+c+d+2)>>2，h2v1 即 (a+b+1)>>1。
 __kernel void downsample_chroma(__global const float* src, int src_stride,
                                 __global float* dst, int dst_stride, int src_w,
-                                int src_h, int dst_w, int dst_h) {
+                                int src_h, int dst_w, int dst_h, int h_ratio,
+                                int v_ratio) {
   int x = get_global_id(0);
   int y = get_global_id(1);
   if (x >= dst_w || y >= dst_h) return;
-  int sx = x * 2;
-  int sy = y * 2;
-  int sxa = sx < src_w ? sx : src_w - 1;
-  int sxb = sx + 1 < src_w ? sx + 1 : src_w - 1;
-  int sya = sy < src_h ? sy : src_h - 1;
-  int syb = sy + 1 < src_h ? sy + 1 : src_h - 1;
-  int a = (int)(src[sya * src_stride + sxa] + 0.5f);
-  int b = (int)(src[sya * src_stride + sxb] + 0.5f);
-  int c = (int)(src[syb * src_stride + sxa] + 0.5f);
-  int d = (int)(src[syb * src_stride + sxb] + 0.5f);
-  dst[y * dst_stride + x] = (float)((a + b + c + d + 2) >> 2);
+  int sx = x * h_ratio;
+  int sy = y * v_ratio;
+  int count = h_ratio * v_ratio;
+  int sum = 0;
+  for (int dy = 0; dy < v_ratio; dy++) {
+    for (int dx = 0; dx < h_ratio; dx++) {
+      int px = sx + dx;
+      int py = sy + dy;
+      int cx = px < src_w ? px : src_w - 1;
+      int cy = py < src_h ? py : src_h - 1;
+      sum += (int)(src[cy * src_stride + cx] + 0.5f);
+    }
+  }
+  dst[y * dst_stride + x] = (float)((sum + count / 2) / count);
 }
 
 // 2D FDCT + 量化。每个 work-item 计算一个块的一个系数。
